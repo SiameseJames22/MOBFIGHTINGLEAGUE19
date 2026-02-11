@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mob Fighting League</title>
+  <title>Mob Fighting League - Live Matches</title>
   <style>
     :root { --bg:#0b0f14; --card:#121a24; --text:#e7eefc; --muted:#98a6bf; --accent:#4aa3ff; --danger:#ff4a4a; --ok:#3dff8b; }
     *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
@@ -34,9 +34,9 @@
     .right{margin-left:auto}
     .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
     .banner{border:1px solid rgba(255,255,255,.12);background:rgba(255,74,74,.12);padding:10px 12px;border-radius:14px}
-    .okbanner{background:rgba(61,255,139,.10)}
     .tag{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.14);padding:4px 8px;border-radius:999px;font-size:12px;color:var(--muted)}
     .hr{height:1px;background:rgba(255,255,255,.08);margin:10px 0}
+    a.link{color:var(--accent);text-decoration:none}
   </style>
 </head>
 <body>
@@ -61,6 +61,7 @@
     </div>
   </div>
 </header>
+
 <main class="wrap">
   <div id="leagueOver" class="banner" style="display:none;margin-bottom:12px;">
     <strong>League Over!</strong>
@@ -79,318 +80,10 @@
 </main>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js";
-  import {
-    getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged,
-    createUserWithEmailAndPassword, signInWithEmailAndPassword
-  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
-  import {
-    getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc,
-    collection, query, orderBy, onSnapshot, getDocs, serverTimestamp
-  } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-  import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
-
-  // ======= EDIT THESE TWO =======
-  const firebaseConfig = FIREBASE_CONFIG_HERE; // paste your Firebase config object here
-  const ADMIN_UID = "ADMIN_UID_HERE";          // paste your UID here (Firebase Auth -> Users)
-  // ==============================
-
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db = getFirestore(app);
-  const storage = getStorage(app);
-
-  const $ = (id) => document.getElementById(id);
-  const escapeHtml = (str) => String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,40) || ("team-"+Math.random().toString(16).slice(2));
-  const fmtDate = (d) => d.toISOString().slice(0,10);
-
-  function getSeasonInfo(now = new Date()) {
-    const year = now.getUTCFullYear();
-    const startThisYear = new Date(Date.UTC(year, 1, 11, 0, 0, 0));
-    const seasonYear = (now < startThisYear) ? year - 1 : year;
-    const start = new Date(Date.UTC(seasonYear, 1, 11, 0, 0, 0));
-    const end = new Date(Date.UTC(seasonYear, 6, 17, 23, 59, 59));
-    const isOver = now > end;
-    return { seasonYear, start, end, isOver };
-  }
-
-  async function addNotification(text){
-    await addDoc(collection(db, "notifications"), { text, createdAt: serverTimestamp() });
-  }
-
-  async function fetchTeams(){
-    const snap = await getDocs(collection(db,"teams"));
-    const list = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    list.sort((a,b)=>
-      (b.points||0)-(a.points||0) ||
-      ((b.gd ?? ((b.gf||0)-(b.ga||0))) - (a.gd ?? ((a.gf||0)-(a.ga||0)))) ||
-      (b.gf||0)-(a.gf||0) ||
-      String(a.name||"").localeCompare(String(b.name||""))
-    );
-    return list;
-  }
-
-  async function fetchTeamsMap(){
-    const teams = await fetchTeams();
-    return new Map(teams.map(t=>[t.id,t]));
-  }
-
-  async function fetchMatches(statuses){
-    const snap = await getDocs(collection(db,"matches"));
-    const list = snap.docs.map(d=>({id:d.id, ...d.data()}));
-    return list.filter(m=>statuses.includes(m.status))
-      .sort((a,b)=> (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
-  }
-
-  async function applyResultToTable(homeId, awayId, homeScore, awayScore){
-    const href = doc(db,"teams",homeId);
-    const aref = doc(db,"teams",awayId);
-    const [hsnap, asnap] = await Promise.all([getDoc(href), getDoc(aref)]);
-    if (!hsnap.exists() || !asnap.exists()) return;
-
-    const h = hsnap.data();
-    const a = asnap.data();
-
-    const hPlayed = (h.played||0)+1;
-    const aPlayed = (a.played||0)+1;
-
-    let hWon=h.won||0, hDraw=h.drawn||0, hLost=h.lost||0, hPts=h.points||0;
-    let aWon=a.won||0, aDraw=a.drawn||0, aLost=a.lost||0, aPts=a.points||0;
-
-    if (homeScore > awayScore) { hWon++; aLost++; hPts += 3; }
-    else if (homeScore < awayScore) { aWon++; hLost++; aPts += 3; }
-    else { hDraw++; aDraw++; hPts += 1; aPts += 1; }
-
-    const hGf=(h.gf||0)+homeScore, hGa=(h.ga||0)+awayScore;
-    const aGf=(a.gf||0)+awayScore, aGa=(a.ga||0)+homeScore;
-
-    await Promise.all([
-      updateDoc(href, { played:hPlayed, won:hWon, drawn:hDraw, lost:hLost, gf:hGf, ga:hGa, gd:hGf-hGa, points:hPts }),
-      updateDoc(aref, { played:aPlayed, won:aWon, drawn:aDraw, lost:aLost, gf:aGf, ga:aGa, gd:aGf-aGa, points:aPts })
-    ]);
-  }
-
-  // Global topbar state
-  onSnapshot(query(collection(db, "notifications"), orderBy("createdAt","desc")), (snap) => {
-    $("notifList").innerHTML = "";
-    snap.docs.slice(0, 20).forEach(d => {
-      const n = d.data();
-      const div = document.createElement("div");
-      div.className = "card";
-      div.style.padding = "10px";
-      div.innerHTML = `<div>${escapeHtml(n.text || "")}</div>
-                       <div class="muted small">${n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : ""}</div>`;
-      $("notifList").appendChild(div);
-    });
-  });
-
-  onAuthStateChanged(auth, async (user) => {
-    const { seasonYear, start, end, isOver } = getSeasonInfo(new Date());
-    $("seasonLabel").textContent = `${seasonYear} (${fmtDate(start)} → ${fmtDate(end)})`;
-    $("leagueOver").style.display = isOver ? "" : "none";
-
-    const path = location.pathname.split("/").pop() || "index.html";
-    document.querySelectorAll('nav a[data-route]').forEach(a => a.classList.remove("active"));
-    const map = { "index.html":"table", "live.html":"live", "clips.html":"clips", "auth.html":"auth", "admin.html":"admin" };
-    const activeKey = map[path];
-    const activeLink = document.querySelector(`nav a[data-route="${activeKey}"]`);
-    if (activeLink) activeLink.classList.add("active");
-
-    if (!user) {
-      $("userLabel").textContent = "Not signed in";
-      $("logoutBtn").style.display = "none";
-      $("adminNav").style.display = "none";
-      window.__user = null;
-      await renderPage();
-      return;
-    }
-
-    window.__user = user;
-
-    $("userLabel").textContent = `${user.displayName || "User"} • ${user.email || ""}`;
-    $("logoutBtn").style.display = "";
-    $("logoutBtn").onclick = async () => { await signOut(auth); location.href = "./auth.html"; };
-
-    $("adminNav").style.display = (user.uid === ADMIN_UID) ? "" : "none";
-
-    // Ensure /users/{uid} exists
-    const uref = doc(db, "users", user.uid);
-    const usnap = await getDoc(uref);
-    if (!usnap.exists()) {
-      await setDoc(uref, {
-        displayName: user.displayName || "",
-        email: user.email || "",
-        favouriteTeam: "",
-        createdAt: serverTimestamp()
-      });
-    }
-    await renderPage();
-  });
-
-  
-  async function renderPage(){
-    const matches = await fetchMatches(["live","scheduled","final"]);
-    const teams = await fetchTeamsMap();
-    const user = window.__user;
-    const isAdmin = user && user.uid === ADMIN_UID;
-
-    const liveList = matches.filter(m=>m.status==="live" || m.status==="scheduled");
-    const finalList = matches.filter(m=>m.status==="final");
-
-    $("page").innerHTML = `
-      <div class="row">
-        <h2 style="margin-right:auto;">Live Matches</h2>
-        <span class="pill small">${isAdmin ? "Admin controls enabled" : "Viewer"}</span>
-      </div>
-
-      ${isAdmin ? `
-        <div class="card" style="margin:10px 0;">
-          <h3>Create match</h3>
-          <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;">
-            <div>
-              <label>Home team</label>
-              <select id="homeTeam">
-                ${Array.from(teams.values()).map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
-              </select>
-            </div>
-            <div>
-              <label>Away team</label>
-              <select id="awayTeam">
-                ${Array.from(teams.values()).map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
-              </select>
-            </div>
-          </div>
-          <div class="row" style="margin-top:10px;">
-            <button class="btn primary" id="createMatchBtn">Create (scheduled)</button>
-            <span class="muted small">Then mark LIVE when it starts.</span>
-          </div>
-        </div>
-      ` : ``}
-
-      <h3>Happening now</h3>
-      <div class="stack" id="liveList">
-        ${liveList.length ? liveList.map(m => matchCard(m, teams, isAdmin)).join("") : `<div class="muted">No live/scheduled matches.</div>`}
-      </div>
-
-      <div class="hr"></div>
-
-      <h3>Finished</h3>
-      <div class="stack" id="finalList">
-        ${finalList.length ? finalList.map(m => finalCard(m, teams)).join("") : `<div class="muted">No finished matches yet.</div>`}
-      </div>
-    `;
-
-    if (isAdmin) {
-      $("createMatchBtn").onclick = async () => {
-        const homeTeamId = $("homeTeam").value;
-        const awayTeamId = $("awayTeam").value;
-        if (!homeTeamId || !awayTeamId || homeTeamId === awayTeamId) return alert("Pick two different teams.");
-        await addDoc(collection(db,"matches"), {
-          homeTeamId, awayTeamId, homeScore:0, awayScore:0,
-          status:"scheduled", createdAt: serverTimestamp()
-        });
-        await addNotification("New match scheduled.");
-        await renderPage();
-      };
-
-      // bind admin buttons for each match
-      document.querySelectorAll("button[data-live]").forEach(btn=>{
-        btn.onclick = async ()=>{
-          const id = btn.getAttribute("data-live");
-          await updateDoc(doc(db,"matches",id), { status:"live", startedAt: serverTimestamp() });
-          await addNotification("Match is LIVE now.");
-          await renderPage();
-        };
-      });
-
-      document.querySelectorAll("button[data-update]").forEach(btn=>{
-        btn.onclick = async ()=>{
-          const id = btn.getAttribute("data-update");
-          const hs = Number(document.querySelector(`input[data-hs="${id}"]`).value || 0);
-          const as = Number(document.querySelector(`input[data-as="${id}"]`).value || 0);
-
-          const msnap = await getDoc(doc(db,"matches",id));
-          const m = msnap.data();
-
-          await updateDoc(doc(db,"matches",id), { homeScore:hs, awayScore:as });
-
-          const home = teams.get(m.homeTeamId)?.name || "Home";
-          const away = teams.get(m.awayTeamId)?.name || "Away";
-          await addNotification(`${home} Scored against ${away}, the score is now [${hs}-${as}]`);
-          await renderPage();
-        };
-      });
-
-      document.querySelectorAll("button[data-end]").forEach(btn=>{
-        btn.onclick = async ()=>{
-          const id = btn.getAttribute("data-end");
-          const hs = Number(document.querySelector(`input[data-hs="${id}"]`).value || 0);
-          const as = Number(document.querySelector(`input[data-as="${id}"]`).value || 0);
-
-          const msnap = await getDoc(doc(db,"matches",id));
-          const m = msnap.data();
-
-          await updateDoc(doc(db,"matches",id), { status:"final", homeScore:hs, awayScore:as, endedAt: serverTimestamp() });
-          await applyResultToTable(m.homeTeamId, m.awayTeamId, hs, as);
-
-          const home = teams.get(m.homeTeamId)?.name || "Home";
-          const away = teams.get(m.awayTeamId)?.name || "Away";
-          const msg =
-            hs > as ? `GAME OVER! ${home} Won Against ${away} [${hs}-${as}]` :
-            hs < as ? `GAME OVER! ${home} Lost Against ${away} [${hs}-${as}]` :
-                      `GAME OVER! ${home} Drew With ${away} [${hs}-${as}]`;
-          await addNotification(msg);
-          await renderPage();
-        };
-      });
-    }
-  }
-
-  function matchCard(m, teams, isAdmin){
-    const home = teams.get(m.homeTeamId)?.name || "Home";
-    const away = teams.get(m.awayTeamId)?.name || "Away";
-    const hs = m.homeScore ?? 0, as = m.awayScore ?? 0;
-    return `
-      <div class="card">
-        <div class="row">
-          <strong>${escapeHtml(home)}</strong><span class="muted">vs</span><strong>${escapeHtml(away)}</strong>
-          <span class="right tag">${String(m.status||"").toUpperCase()}</span>
-        </div>
-        <div style="font-size:28px;margin-top:6px;"><strong>${hs}-${as}</strong></div>
-        <div class="muted small">Match ID: <span class="mono">${escapeHtml(m.id)}</span></div>
-
-        ${isAdmin ? `
-          <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
-            <div><label>Home score</label><input type="number" min="0" value="${hs}" data-hs="${m.id}"></div>
-            <div><label>Away score</label><input type="number" min="0" value="${as}" data-as="${m.id}"></div>
-          </div>
-          <div class="row" style="margin-top:10px;">
-            <button class="btn" data-live="${m.id}">Mark LIVE</button>
-            <button class="btn primary" data-update="${m.id}">Update score</button>
-            <button class="btn danger" data-end="${m.id}">End match</button>
-          </div>
-        ` : ``}
-      </div>
-    `;
-  }
-
-  function finalCard(m, teams){
-    const home = teams.get(m.homeTeamId)?.name || "Home";
-    const away = teams.get(m.awayTeamId)?.name || "Away";
-    const hs = m.homeScore ?? 0, as = m.awayScore ?? 0;
-    return `
-      <div class="card">
-        <div class="row">
-          <strong>${escapeHtml(home)}</strong><span class="muted">vs</span><strong>${escapeHtml(away)}</strong>
-          <span class="right tag">FINAL</span>
-        </div>
-        <div style="font-size:24px;margin-top:6px;"><strong>${hs}-${as}</strong></div>
-        <div class="muted small">Match ID: <span class="mono">${escapeHtml(m.id)}</span></div>
-      </div>
-    `;
-  }
-
+  import { start } from "./js/app.js";
+  import { renderPage } from "./js/pages/live.js";
+  start(renderPage, "live");
 </script>
+
 </body>
 </html>

@@ -1,28 +1,43 @@
-Mob Fighting League (GitHub Pages + Firebase)
+MOBFIGHTINGLEAGUE19 (Multi-page version) ✅
 
-1) Open each HTML file and replace:
-   - FIREBASE_CONFIG_HERE  (paste your Firebase web config object)
+FILES
+- index.html   (League Table)
+- live.html    (Live matches + admin score controls)
+- clips.html   (Clips browser + admin upload)
+- auth.html    (Login + signup)
+- admin.html   (Bulk add teams)
+
+JS
+- js/config.js        <-- EDIT THIS ONCE (Firebase config + ADMIN_UID)
+- js/app.js           shared Firebase + UI + helpers
+- js/pages/*.js       page logic
+
+SETUP
+1) Open js/config.js and replace:
+   - FIREBASE_CONFIG_HERE  (paste your Firebase config object)
    - ADMIN_UID_HERE        (your UID from Firebase Auth -> Users)
 
-2) Firebase Console setup:
+2) Firebase Console:
    Auth -> Sign-in method:
      - Enable Google
      - Enable Email/Password
-
    Auth -> Settings -> Authorized domains:
      - siamesejames22.github.io
 
-   Firestore + Storage rules:
-     - Use the admin-only write rules you already set up (ADMIN_UID).
-
-3) Upload these files to your GitHub Pages repo root:
-   index.html, auth.html, live.html, clips.html, admin.html
-
-4) Go to Admin page (after signing in as admin):
+3) Put ALL files in your repo root (keep the js folder).
+   Your repo should look like:
+   /index.html
+   /live.html
+   /clips.html
+   /auth.html
    /admin.html
-   Click 'Bulk add teams' to add all 16 teams quickly.
+   /js/config.js
+   /js/app.js
+   /js/pages/...
 
-Notes:
-- Notifications show in the right panel on every page.
-- Live score editing is on live.html (admin only).
-- Clip uploads are on clips.html (admin only).
+4) Go to:
+   https://siamesejames22.github.io/MOBFIGHTINGLEAGUE19/
+
+NOTES
+- If every page looks the same, it usually means the page module didn't load.
+  Make sure the /js folder exists in your repo and isn't nested in another folder.

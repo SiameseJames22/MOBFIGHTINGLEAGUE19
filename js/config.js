@@ -1,0 +1,3 @@
+// EDIT THIS FILE (only once) ✅
+export const firebaseConfig = FIREBASE_CONFIG_HERE; // paste Firebase web config object
+export const ADMIN_UID = "ADMIN_UID_HERE";          // paste your UID (Firebase Auth -> Users)
