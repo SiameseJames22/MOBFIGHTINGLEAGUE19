@@ -6,11 +6,13 @@ import {
   GoogleAuthProvider, signInWithPopup,
   createUserWithEmailAndPassword, signInWithEmailAndPassword
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js";
+
 import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc,
+  getFirestore, doc, getDoc, setDoc, updateDoc, addDoc,
   collection, query, orderBy, onSnapshot, getDocs, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
+
+import { getStorage } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
 
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
@@ -60,8 +62,7 @@ export async function fetchTeamsMap(){
 export async function fetchMatches(statuses){
   const snap = await getDocs(collection(db,"matches"));
   const list = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  return list
-    .filter(m=>statuses.includes(m.status))
+  return list.filter(m=>statuses.includes(m.status))
     .sort((a,b)=> (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
 }
 
@@ -93,68 +94,61 @@ export async function applyResultToTable(homeId, awayId, homeScore, awayScore){
   ]);
 }
 
-// Auth helpers exported for auth page
+// Auth helpers
 export const AuthUI = {
   GoogleAuthProvider, signInWithPopup,
   createUserWithEmailAndPassword, signInWithEmailAndPassword
 };
 
-// Favourite Team prompt (popup)
-export async function showFavouriteTeamPrompt(user){
+async function showFavouriteTeamPrompt(user){
   const teams = await fetchTeams();
-
-  // If no teams yet, don't block user
   if (!teams.length) return;
 
-  // Create overlay
-  let overlay = document.getElementById("favOverlay");
-  if (!overlay) {
-    overlay = document.createElement("div");
-    overlay.id = "favOverlay";
-    overlay.style.cssText = `
-      position:fixed; inset:0; background:rgba(0,0,0,.65);
-      display:flex; align-items:center; justify-content:center; padding:16px; z-index:9999;
-    `;
-    overlay.innerHTML = `
-      <div style="max-width:520px;width:100%;" class="card">
-        <h2 style="margin:0 0 8px 0;">Pick your favourite team</h2>
-        <div class="muted small" style="margin-bottom:10px;">You must pick one to continue.</div>
-        <div class="stack">
-          <div>
-            <label>Favourite team</label>
-            <select id="favPick"></select>
-          </div>
-          <button class="btn primary" id="favSave">Save</button>
+  // already exists?
+  if (document.getElementById("favOverlay")) return;
+
+  const overlay = document.createElement("div");
+  overlay.id = "favOverlay";
+  overlay.style.cssText = `
+    position:fixed; inset:0; background:rgba(0,0,0,.65);
+    display:flex; align-items:center; justify-content:center; padding:16px; z-index:9999;
+  `;
+
+  overlay.innerHTML = `
+    <div style="max-width:520px;width:100%;" class="card">
+      <h2 style="margin:0 0 8px 0;">Pick your favourite team</h2>
+      <div class="muted small" style="margin-bottom:10px;">You must pick one to continue.</div>
+      <div class="stack">
+        <div>
+          <label>Favourite team</label>
+          <select id="favPick">
+            <option value="">— Choose —</option>
+            ${teams.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
+          </select>
         </div>
+        <button class="btn primary" id="favSave">Save</button>
       </div>
-    `;
-    document.body.appendChild(overlay);
-  }
+    </div>
+  `;
 
-  const sel = overlay.querySelector("#favPick");
-  sel.innerHTML = `<option value="">— Choose —</option>` + teams.map(t =>
-    `<option value="${t.id}">${escapeHtml(t.name)}</option>`
-  ).join("");
+  document.body.appendChild(overlay);
 
-  return new Promise((resolve) => {
-    overlay.querySelector("#favSave").onclick = async () => {
-      const v = sel.value;
-      if (!v) return alert("Pick a team first.");
-      await updateDoc(doc(db,"users",user.uid), { favouriteTeam: v });
-      overlay.remove();
-      resolve();
-    };
-  });
+  overlay.querySelector("#favSave").onclick = async () => {
+    const v = overlay.querySelector("#favPick").value;
+    if (!v) return alert("Pick a team first.");
+    await updateDoc(doc(db,"users",user.uid), { favouriteTeam: v });
+    overlay.remove();
+  };
 }
 
-// Main bootstrap called by each page
+// Bootstrap
 export function start(renderPage, activeKey){
-  // highlight nav
+  // nav highlight
   document.querySelectorAll('nav a[data-route]').forEach(a => {
     a.classList.toggle("active", a.getAttribute("data-route") === activeKey);
   });
 
-  // notifications panel
+  // notifications
   onSnapshot(query(collection(db, "notifications"), orderBy("createdAt","desc")), (snap) => {
     const list = $("notifList");
     if (!list) return;
@@ -165,7 +159,7 @@ export function start(renderPage, activeKey){
       div.className = "card";
       div.style.padding = "10px";
       div.innerHTML = `<div>${escapeHtml(n.text || "")}</div>
-                      <div class="muted small">${n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : ""}</div>`;
+        <div class="muted small">${n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : ""}</div>`;
       list.appendChild(div);
     });
   });
@@ -204,7 +198,7 @@ export function start(renderPage, activeKey){
       });
     }
 
-    // Ask for favourite team if missing (not on auth page)
+    // ask favourite team if missing (not on auth page)
     const usnap2 = await getDoc(uref);
     const udata = usnap2.data() || {};
     if (!udata.favouriteTeam && activeKey !== "auth") {
