@@ -12,12 +12,6 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 import { getStorage, ref, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
 
-import {
-  getFirestore, doc, getDoc, setDoc, updateDoc, addDoc, deleteDoc,
-  collection, query, orderBy, onSnapshot, getDocs, serverTimestamp
-} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-
-
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
@@ -26,8 +20,10 @@ export const storage = getStorage(app);
 export const ADMIN = { uid: ADMIN_UID };
 
 export const $ = (id) => document.getElementById(id);
-export const escapeHtml = (str) => String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-export const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,40) || ("team-"+Math.random().toString(16).slice(2));
+export const escapeHtml = (str) =>
+  String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+export const slug = (s) =>
+  s.toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"").slice(0,40) || ("team-"+Math.random().toString(16).slice(2));
 export const fmtDate = (d) => d.toISOString().slice(0,10);
 
 export function getSeasonInfo(now = new Date()) {
@@ -64,7 +60,8 @@ export async function fetchTeamsMap(){
 export async function fetchMatches(statuses){
   const snap = await getDocs(collection(db,"matches"));
   const list = snap.docs.map(d=>({id:d.id, ...d.data()}));
-  return list.filter(m=>statuses.includes(m.status))
+  return list
+    .filter(m=>statuses.includes(m.status))
     .sort((a,b)=> (b.createdAt?.seconds||0)-(a.createdAt?.seconds||0));
 }
 
@@ -102,6 +99,54 @@ export const AuthUI = {
   createUserWithEmailAndPassword, signInWithEmailAndPassword
 };
 
+// Favourite Team prompt (popup)
+export async function showFavouriteTeamPrompt(user){
+  const teams = await fetchTeams();
+
+  // If no teams yet, don't block user
+  if (!teams.length) return;
+
+  // Create overlay
+  let overlay = document.getElementById("favOverlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "favOverlay";
+    overlay.style.cssText = `
+      position:fixed; inset:0; background:rgba(0,0,0,.65);
+      display:flex; align-items:center; justify-content:center; padding:16px; z-index:9999;
+    `;
+    overlay.innerHTML = `
+      <div style="max-width:520px;width:100%;" class="card">
+        <h2 style="margin:0 0 8px 0;">Pick your favourite team</h2>
+        <div class="muted small" style="margin-bottom:10px;">You must pick one to continue.</div>
+        <div class="stack">
+          <div>
+            <label>Favourite team</label>
+            <select id="favPick"></select>
+          </div>
+          <button class="btn primary" id="favSave">Save</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+  }
+
+  const sel = overlay.querySelector("#favPick");
+  sel.innerHTML = `<option value="">— Choose —</option>` + teams.map(t =>
+    `<option value="${t.id}">${escapeHtml(t.name)}</option>`
+  ).join("");
+
+  return new Promise((resolve) => {
+    overlay.querySelector("#favSave").onclick = async () => {
+      const v = sel.value;
+      if (!v) return alert("Pick a team first.");
+      await updateDoc(doc(db,"users",user.uid), { favouriteTeam: v });
+      overlay.remove();
+      resolve();
+    };
+  });
+}
+
 // Main bootstrap called by each page
 export function start(renderPage, activeKey){
   // highlight nav
@@ -111,7 +156,9 @@ export function start(renderPage, activeKey){
 
   // notifications panel
   onSnapshot(query(collection(db, "notifications"), orderBy("createdAt","desc")), (snap) => {
-    $("notifList").innerHTML = "";
+    const list = $("notifList");
+    if (!list) return;
+    list.innerHTML = "";
     snap.docs.slice(0, 20).forEach(d => {
       const n = d.data();
       const div = document.createElement("div");
@@ -119,29 +166,31 @@ export function start(renderPage, activeKey){
       div.style.padding = "10px";
       div.innerHTML = `<div>${escapeHtml(n.text || "")}</div>
                       <div class="muted small">${n.createdAt?.toDate ? n.createdAt.toDate().toLocaleString() : ""}</div>`;
-      $("notifList").appendChild(div);
+      list.appendChild(div);
     });
   });
 
   onAuthStateChanged(auth, async (user) => {
     const { seasonYear, start, end, isOver } = getSeasonInfo(new Date());
-    $("seasonLabel").textContent = `${seasonYear} (${fmtDate(start)} → ${fmtDate(end)})`;
-    $("leagueOver").style.display = isOver ? "" : "none";
+    if ($("seasonLabel")) $("seasonLabel").textContent = `${seasonYear} (${fmtDate(start)} → ${fmtDate(end)})`;
+    if ($("leagueOver")) $("leagueOver").style.display = isOver ? "" : "none";
 
     if (!user) {
       window.__user = null;
-      $("userLabel").textContent = "Not signed in";
-      $("logoutBtn").style.display = "none";
-      $("adminNav").style.display = "none";
+      if ($("userLabel")) $("userLabel").textContent = "Not signed in";
+      if ($("logoutBtn")) $("logoutBtn").style.display = "none";
+      if ($("adminNav")) $("adminNav").style.display = "none";
       await renderPage({ user: null });
       return;
     }
 
     window.__user = user;
-    $("userLabel").textContent = `${user.displayName || "User"} • ${user.email || ""}`;
-    $("logoutBtn").style.display = "";
-    $("logoutBtn").onclick = async () => { await signOut(auth); location.href = "./auth.html"; };
-    $("adminNav").style.display = (user.uid === ADMIN_UID) ? "" : "none";
+    if ($("userLabel")) $("userLabel").textContent = `${user.displayName || "User"} • ${user.email || ""}`;
+    if ($("logoutBtn")) {
+      $("logoutBtn").style.display = "";
+      $("logoutBtn").onclick = async () => { await signOut(auth); location.href = "./auth.html"; };
+    }
+    if ($("adminNav")) $("adminNav").style.display = (user.uid === ADMIN_UID) ? "" : "none";
 
     // ensure users/{uid}
     const uref = doc(db, "users", user.uid);
@@ -153,6 +202,13 @@ export function start(renderPage, activeKey){
         favouriteTeam: "",
         createdAt: serverTimestamp()
       });
+    }
+
+    // Ask for favourite team if missing (not on auth page)
+    const usnap2 = await getDoc(uref);
+    const udata = usnap2.data() || {};
+    if (!udata.favouriteTeam && activeKey !== "auth") {
+      await showFavouriteTeamPrompt(user);
     }
 
     await renderPage({ user });
