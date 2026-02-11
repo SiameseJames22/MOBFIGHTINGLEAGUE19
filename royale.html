@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mob Fighting League — Mob Royale</title>
+  <style>
+    :root{--bg:#0b0f14;--card:#121a24;--text:#e7eefc;--muted:#98a6bf;--accent:#4aa3ff}
+    *{box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial}
+    body{margin:0;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;z-index:10;background:rgba(11,15,20,.9);backdrop-filter: blur(10px);border-bottom:1px solid rgba(255,255,255,.08)}
+    .wrap{max-width:1100px;margin:0 auto;padding:14px 16px}
+    .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    nav a{color:var(--muted);text-decoration:none;margin-right:12px}
+    nav a.active{color:var(--text)}
+    .btn{border:1px solid rgba(255,255,255,.14);background:transparent;color:var(--text);padding:8px 10px;border-radius:12px;cursor:pointer}
+    .card{background:var(--card);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:14px}
+    .grid{display:grid;gap:12px}
+    .grid.two{grid-template-columns:1fr;}
+    @media(min-width:980px){ .grid.two{grid-template-columns: 1.2fr .8fr;} }
+    .muted{color:var(--muted)}
+    .pill{display:inline-flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.12);padding:6px 10px;border-radius:999px;color:var(--muted)}
+    .small{font-size:12px}
+    .right{margin-left:auto}
+    .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+    .banner{border:1px solid rgba(255,255,255,.12);background:rgba(74,163,255,.10);padding:10px 12px;border-radius:14px}
+    .tag{display:inline-flex;align-items:center;border:1px solid rgba(255,255,255,.14);padding:4px 8px;border-radius:999px;font-size:12px;color:var(--muted)}
+  </style>
+</head>
+<body>
+<header>
+  <div class="wrap row">
+    <div class="row" style="gap:12px;">
+      <strong>Mob Fighting League</strong>
+      <span class="pill small">Season: <span class="mono" id="seasonLabel">—</span></span>
+    </div>
+
+    <nav class="right">
+      <a href="./index.html" data-route="table">Table</a>
+      <a href="./live.html" data-route="live">Live Matches</a>
+      <a href="./clips.html" data-route="clips">Clips</a>
+      <a href="./royale.html" data-route="royale">Mob Royale</a>
+      <a href="./trophies.html" data-route="trophies">Trophies</a>
+      <a href="./auth.html" data-route="auth">Login</a>
+      <a href="./admin.html" data-route="admin" id="adminNav" style="display:none;">Admin</a>
+    </nav>
+
+    <div class="row">
+      <span id="userLabel" class="muted small">Not signed in</span>
+      <button id="logoutBtn" class="btn" style="display:none;">Sign out</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="leagueOver" class="banner" style="display:none;margin-bottom:12px;">
+    <strong>League Over!</strong>
+    <div class="muted small">This season is closed (July 17). Come back next February to start a new league.</div>
+  </div>
+
+  <div class="grid two">
+    <section class="card" id="page"></section>
+
+    <aside class="card">
+      <h3>Notifications</h3>
+      <div class="muted small" style="margin-bottom:10px;">Updates appear here whenever scores change or matches end.</div>
+      <div id="notifList" class="grid"></div>
+    </aside>
+  </div>
+</main>
+
+<script type="module">
+  import { start } from "./js/app.js";
+  import { renderPage } from "./js/pages/royale.js";
+  start(renderPage, "royale");
+</script>
+</body>
+</html>
