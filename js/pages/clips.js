@@ -144,5 +144,157 @@ export async function renderPage({ user } = {}) {
     // triggers snapshot redraw naturally next tick
     // but we can manually trigger by doing nothing; list rerenders on next snapshot.
     // simplest: just refresh current snapshot UI by dispatching a change event is enough
+    import { $, escapeHtml, db, ADMIN } from "../app.js";
+import {
+  doc, getDoc, collection, addDoc, serverTimestamp,
+  query, orderBy, onSnapshot, setDoc, deleteDoc, getDocs
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+
+function clipIdFromUrl(){
+  const u = new URL(location.href);
+  return u.searchParams.get("id");
+}
+
+export async function renderPage({ user } = {}) {
+  const clipId = clipIdFromUrl();
+  if (!clipId) {
+    $("page").innerHTML = `<h2>Clip</h2><div class="muted">Missing clip id.</div>`;
+    return;
+  }
+
+  const cref = doc(db, "clips", clipId);
+  const snap = await getDoc(cref);
+  if (!snap.exists()) {
+    $("page").innerHTML = `<h2>Clip</h2><div class="muted">Clip not found.</div>`;
+    return;
+  }
+
+  const c = snap.data();
+  document.title = c.title ? `Clip — ${c.title}` : "Clip";
+
+  $("page").innerHTML = `
+    <div class="row">
+      <h2 style="margin-right:auto;">${escapeHtml(c.title||"Untitled")}</h2>
+      <span class="tag">${escapeHtml(c.team||"")}</span>
+    </div>
+
+    <div class="muted small" style="margin-top:6px;">${escapeHtml(c.desc||"")}</div>
+
+    <div class="card" style="margin-top:12px;padding:12px;">
+      ${c.url ? `
+        <video id="vid" controls playsinline style="width:100%;border-radius:14px;background:#000" preload="metadata"></video>
+      ` : `<div class="muted">Video still processing / missing URL.</div>`}
+    </div>
+
+    <div class="row" style="margin-top:12px;gap:8px;">
+      <button class="btn" id="likeBtn">👍 Like <span id="likeCount" class="muted">0</span></button>
+      <button class="btn" id="dislikeBtn">👎 Dislike <span id="dislikeCount" class="muted">0</span></button>
+      <button class="btn primary right" id="subBtn">Subscribe to ${escapeHtml(c.team||"team")}</button>
+    </div>
+
+    <div class="card" style="margin-top:12px;">
+      <h3>Comments</h3>
+      ${user ? `
+        <div class="row" style="margin-top:8px;">
+          <input id="commentText" placeholder="Write a comment…" style="flex:1;">
+          <button class="btn primary" id="commentBtn">Post</button>
+        </div>
+      ` : `<div class="muted small">Sign in to comment.</div>`}
+      <div id="commentList" class="grid" style="margin-top:10px;"></div>
+    </div>
+  `;
+
+  if (c.url) {
+    const v = document.getElementById("vid");
+    v.src = c.url;
+  }
+
+  // --- Reactions (likes/dislikes) ---
+  const reactionsRef = collection(db, "clips", clipId, "reactions");
+  const rQ = query(reactionsRef);
+  onSnapshot(rQ, (rsnap) => {
+    let likes = 0, dislikes = 0;
+    rsnap.docs.forEach(d=>{
+      const val = d.data()?.value;
+      if (val === 1) likes++;
+      if (val === -1) dislikes++;
+    });
+    $("likeCount").textContent = likes;
+    $("dislikeCount").textContent = dislikes;
+  });
+
+  async function setReaction(value){
+    if (!user) return alert("Sign in to like/dislike.");
+    const myRef = doc(db, "clips", clipId, "reactions", user.uid);
+    // toggle: if same value exists => remove
+    const cur = await getDoc(myRef);
+    if (cur.exists() && cur.data()?.value === value) {
+      await deleteDoc(myRef);
+      return;
+    }
+    await setDoc(myRef, { value, uid:user.uid, updatedAt: serverTimestamp() }, { merge:true });
+  }
+
+  $("likeBtn").onclick = () => setReaction(1);
+  $("dislikeBtn").onclick = () => setReaction(-1);
+
+  // --- Subscribe to team ---
+  async function refreshSub(){
+    if (!user) { $("subBtn").textContent = `Subscribe to ${c.team||"team"}`; return; }
+    const subRef = doc(db, "users", user.uid, "subs", String(c.team||"team"));
+    const s = await getDoc(subRef);
+    $("subBtn").textContent = s.exists() ? `Subscribed ✅ (${c.team})` : `Subscribe to ${c.team}`;
+  }
+
+  $("subBtn").onclick = async () => {
+    if (!user) return alert("Sign in to subscribe.");
+    const subRef = doc(db, "users", user.uid, "subs", String(c.team||"team"));
+    const s = await getDoc(subRef);
+    if (s.exists()) await deleteDoc(subRef);
+    else await setDoc(subRef, { team: c.team, createdAt: serverTimestamp() });
+    await refreshSub();
+  };
+
+  await refreshSub();
+
+  // --- Comments ---
+  const cRef = collection(db, "clips", clipId, "comments");
+  const cQ = query(cRef, orderBy("createdAt","desc"));
+
+  onSnapshot(cQ, (csnap) => {
+    const list = $("commentList");
+    list.innerHTML = "";
+    csnap.docs.forEach(d=>{
+      const x = d.data();
+      const div = document.createElement("div");
+      div.className = "card";
+      div.style.padding = "10px";
+      div.innerHTML = `
+        <div class="row">
+          <strong>${escapeHtml(x.displayName || "User")}</strong>
+          <span class="right muted small">${x.createdAt?.toDate ? x.createdAt.toDate().toLocaleString() : ""}</span>
+        </div>
+        <div style="margin-top:6px;">${escapeHtml(x.text || "")}</div>
+      `;
+      list.appendChild(div);
+    });
+    if (!csnap.docs.length) list.innerHTML = `<div class="muted">No comments yet.</div>`;
+  });
+
+  if (user) {
+    $("commentBtn").onclick = async () => {
+      const text = $("commentText").value.trim();
+      if (!text) return;
+      await addDoc(cRef, {
+        uid: user.uid,
+        displayName: user.displayName || user.email || "User",
+        text,
+        createdAt: serverTimestamp()
+      });
+      $("commentText").value = "";
+    };
+  }
+}
+
   };
 }
