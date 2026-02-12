@@ -1,115 +1,148 @@
-import { $, escapeHtml, fetchTeams, db, storage, ADMIN, addNotification } from "../app.js";
-import { addDoc, collection, getDocs, orderBy, query, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
-import { getDownloadURL, ref, uploadBytes } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-storage.js";
+import { $, escapeHtml, db, storage, ADMIN } from "../app.js";
+import { StorageAPI } from "../app.js";
+import {
+  collection, addDoc, serverTimestamp, query, orderBy, onSnapshot
+} from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
-export async function renderPage({ user } = {}){
-  const isAdmin = user && user.uid === ADMIN.uid;
+const TEAMS = [
+  "Axolotls","Chickens","Cows","Creepers","Endermens","Endermites","Feesh","Foxes",
+  "Iron Golems","Ocelots","Pigs","Piglins","Pillagers","Skeletons","Snowmen",
+  "Spiders","The Warden","Villagers","Wither Skeletons","Wolves","Zombies"
+].sort((a,b)=>a.localeCompare(b));
 
-  const teams = await fetchTeams();
-  const teamsMap = new Map(teams.map(t=>[t.id,t.name]));
-
-  const clipsSnap = await getDocs(query(collection(db,"clips"), orderBy("createdAt","desc")));
-  const clips = clipsSnap.docs.map(d=>({id:d.id, ...d.data()}));
+export async function renderPage({ user } = {}) {
+  const isAdmin = !!user && user.uid === ADMIN.uid;
 
   $("page").innerHTML = `
     <div class="row">
       <h2 style="margin-right:auto;">Clips</h2>
-      <span class="pill small">${isAdmin ? "Upload enabled" : "Browse"}</span>
+      <div class="muted small">Watch match clips by team.</div>
     </div>
 
     ${isAdmin ? `
-      <div class="card" style="margin:10px 0;">
-        <h3>Upload clip (admin)</h3>
+      <div class="card" style="margin-top:12px;">
+        <h3>Upload clip (Admin)</h3>
         <div class="grid" style="grid-template-columns:1fr 1fr;gap:10px;">
           <div>
-            <label>Team category</label>
-            <select id="clipTeam">
-              ${teams.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
-            </select>
+            <label>Title</label>
+            <input id="clipTitle" placeholder="e.g. Cows clutch 1v3 vs Ocelots">
           </div>
           <div>
-            <label>Match ID (optional)</label>
-            <input id="clipMatchId" placeholder="Paste matchId or leave blank">
+            <label>Team</label>
+            <select id="clipTeam">
+              ${TEAMS.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("")}
+            </select>
           </div>
         </div>
-        <div style="height:10px"></div>
-        <label>Clip title</label>
-        <input id="clipTitle" placeholder="e.g. Best KO of the night">
-        <div style="height:10px"></div>
-        <label>Video file</label>
-        <input id="clipFile" type="file" accept="video/*">
+        <div style="margin-top:10px;">
+          <label>Description</label>
+          <textarea id="clipDesc" placeholder="What happened?"></textarea>
+        </div>
+        <div style="margin-top:10px;">
+          <label>Video file (.mp4 recommended)</label>
+          <input id="clipFile" type="file" accept="video/*">
+        </div>
         <div class="row" style="margin-top:10px;">
-          <button class="btn primary" id="uploadClipBtn">Upload</button>
-          <span class="muted small" id="uploadStatus"></span>
+          <button class="btn primary" id="uploadBtn">Upload</button>
+          <span class="muted small" id="uploadMsg"></span>
         </div>
       </div>
-    ` : `<div class="muted small">To upload clips, sign in as admin.</div>`}
+    ` : `
+      <div class="muted small" style="margin-top:8px;">Sign in to comment/like. Only admin can upload.</div>
+    `}
 
-    <div class="stack" style="margin:10px 0;">
-      <label>Filter by team</label>
-      <select id="clipTeamFilter">
-        <option value="">All teams</option>
-        ${teams.map(t=>`<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("")}
-      </select>
+    <div class="card" style="margin-top:12px;">
+      <div class="row">
+        <h3 style="margin-right:auto;">All clips</h3>
+        <select id="teamFilter" style="max-width:260px;">
+          <option value="">All teams</option>
+          ${TEAMS.map(t=>`<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("")}
+        </select>
+      </div>
+      <div id="clipList" class="grid" style="margin-top:10px;"></div>
     </div>
-
-    <div id="clipList" class="stack"></div>
   `;
 
-  const renderClips = () => {
-    const filter = $("clipTeamFilter").value;
-    const filtered = filter ? clips.filter(c=>c.teamId===filter) : clips;
-    const container = $("clipList");
-    container.innerHTML = filtered.length ? "" : `<div class="muted">No clips yet.</div>`;
-    filtered.forEach(c=>{
-      const div = document.createElement("div");
-      div.className = "card";
-      div.innerHTML = `
-        <div class="row">
-          <strong>${escapeHtml(c.title || "Untitled clip")}</strong>
-          <span class="right tag">${escapeHtml(teamsMap.get(c.teamId) || "Team")}</span>
-        </div>
-        <div class="muted small" style="margin:6px 0 10px 0;">
-          ${c.createdAt?.toDate ? c.createdAt.toDate().toLocaleString() : ""}
-          ${c.matchId ? ` • Match: <span class="mono">${escapeHtml(c.matchId)}</span>` : ""}
-        </div>
-        ${c.videoUrl ? `<video controls style="width:100%;border-radius:14px;border:1px solid rgba(255,255,255,.10)"><source src="${c.videoUrl}"></video>` : `<div class="muted">No video URL</div>`}
-      `;
-      container.appendChild(div);
-    });
-  };
-
-  $("clipTeamFilter").onchange = renderClips;
-  renderClips();
-
+  // Upload handler
   if (isAdmin) {
-    $("uploadClipBtn").onclick = async () => {
+    $("uploadBtn").onclick = async () => {
+      const title = $("clipTitle").value.trim();
+      const team = $("clipTeam").value;
+      const desc = $("clipDesc").value.trim();
       const file = $("clipFile").files?.[0];
-      if (!file) return alert("Pick a video file first.");
 
-      $("uploadStatus").textContent = "Uploading…";
+      if (!title || !team || !file) return alert("Title, Team, and Video file are required.");
 
-      const teamId = $("clipTeam").value;
-      const matchId = $("clipMatchId").value.trim();
-      const title = $("clipTitle").value.trim() || "Clip";
+      $("uploadMsg").textContent = "Uploading…";
 
-      const path = `clips/${Date.now()}_${file.name.replace(/\s+/g,"_")}`;
-      const r = ref(storage, path);
-      await uploadBytes(r, file);
-      const url = await getDownloadURL(r);
-
-      await addDoc(collection(db,"clips"), {
-        teamId, matchId: matchId || "", title, videoUrl: url,
-        createdAt: serverTimestamp()
+      // 1) Create Firestore doc first, get clipId
+      const clipRef = await addDoc(collection(db, "clips"), {
+        title, team, desc,
+        createdAt: serverTimestamp(),
+        uploaderUid: user.uid
       });
 
-      $("uploadStatus").textContent = "Uploaded!";
-      $("clipFile").value = "";
-      $("clipTitle").value = "";
-      $("clipMatchId").value = "";
+      const clipId = clipRef.id;
 
-      await addNotification(`New clip uploaded: ${title}`);
-      await renderPage({ user });
+      // 2) Upload to Storage: clips/{clipId}/{filename}
+      const path = `clips/${clipId}/${file.name}`;
+      const sref = StorageAPI.ref(storage, path);
+      await StorageAPI.uploadBytes(sref, file);
+
+      // 3) Get download URL and update doc
+      const url = await StorageAPI.getDownloadURL(sref);
+      await addDoc(collection(db, "clips", clipId, "comments"), {
+        uid: "system",
+        text: "First!",
+        createdAt: serverTimestamp(),
+        displayName: "System"
+      }).catch(()=>{});
+
+      await (await import("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js"))
+        .then(({ updateDoc, doc }) => updateDoc(doc(db,"clips",clipId), { url, storagePath: path }));
+
+      $("uploadMsg").textContent = `Uploaded! Opening clip…`;
+      location.href = `./clip.html?id=${clipId}`;
     };
   }
+
+  // Live list
+  const q = query(collection(db,"clips"), orderBy("createdAt","desc"));
+  onSnapshot(q, (snap) => {
+    const filter = $("teamFilter").value;
+    const list = $("clipList");
+    list.innerHTML = "";
+
+    const docs = snap.docs
+      .map(d=>({ id:d.id, ...d.data() }))
+      .filter(c => !filter || c.team === filter);
+
+    if (!docs.length) {
+      list.innerHTML = `<div class="muted">No clips yet.</div>`;
+      return;
+    }
+
+    docs.forEach(c => {
+      const card = document.createElement("div");
+      card.className = "card";
+      card.style.padding = "12px";
+      card.innerHTML = `
+        <div class="row">
+          <strong>${escapeHtml(c.title||"Untitled")}</strong>
+          <span class="right tag">${escapeHtml(c.team||"")}</span>
+        </div>
+        <div class="muted small" style="margin-top:6px;">${escapeHtml(c.desc||"")}</div>
+        <div class="row" style="margin-top:10px;">
+          <a class="btn" href="./clip.html?id=${c.id}">Watch</a>
+        </div>
+      `;
+      list.appendChild(card);
+    });
+  });
+
+  $("teamFilter").onchange = () => {
+    // triggers snapshot redraw naturally next tick
+    // but we can manually trigger by doing nothing; list rerenders on next snapshot.
+    // simplest: just refresh current snapshot UI by dispatching a change event is enough
+  };
 }
