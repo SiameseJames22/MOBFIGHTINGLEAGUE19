@@ -10,7 +10,7 @@ function zoneForPos(pos, total){
   if (pos === 1) return { key:"champ", label:"Champion" };
   if (pos >= 2 && pos <= 4) return { key:"qual", label:"Mob Royale Qualifier" };
   if (pos >= 5 && pos <= 8) return { key:"play", label:"Mob Royale Playoff" };
-  if (pos >= 14) return { key:"rel", label:"Relegation" };
+  if (pos >= 19) return { key:"rel", label:"Relegation" };
   return { key:"norm", label:"Normal" };
 }
 
