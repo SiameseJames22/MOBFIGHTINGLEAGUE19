@@ -1,0 +1,42 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Clip</title>
+  <link rel="stylesheet" href="./js/ui.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="wrap row">
+      <strong>Mob Fighting League</strong>
+      <nav class="right">
+        <a href="./index.html">Table</a>
+        <a href="./live.html">Live Matches</a>
+        <a href="./clips.html" class="active">Clips</a>
+        <a href="./auth.html">Login</a>
+        <a href="./admin.html" id="adminNav" style="display:none;">Admin</a>
+      </nav>
+      <div class="row">
+        <span id="userLabel" class="muted small">Not signed in</span>
+        <button id="logoutBtn" class="btn" style="display:none;">Sign out</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap grid two">
+    <section class="card" id="page"></section>
+    <aside class="card">
+      <h3>Notifications</h3>
+      <div class="muted small">Match updates appear here.</div>
+      <div id="notifList" class="grid"></div>
+    </aside>
+  </main>
+
+  <script type="module">
+    import { start } from "./js/app.js";
+    import { renderPage } from "./js/pages/clip.js";
+    start(renderPage, "clips");
+  </script>
+</body>
+</html>
