@@ -1,30 +1,50 @@
 import { $, escapeHtml, fetchTeams } from "../app.js";
 
-// Track the active division state
-let activeDivision = 1;
+// Track active tier (1 = Mob League, 2 = Mob Championship, 3 = Mob League One)
+let activeTier = 1;
 
-function zoneForPos(pos, total, division) {
-  // DIVISION 1 RULES
-  if (division === 1) {
+// Generated teams for Tier 2: Mob Championship (24 Teams)
+const championshipTeams = [
+  "Wither Skeleton FC", "Piglin Brute United", "Evoker City", "Vindicator Athletic",
+  "Blaze Rovers", "Ghast Rangers", "Endermite FC", "Magma Cube Albion",
+  "Cave Spider Town", "Husk United", "Stray City", "Drowned Athletic",
+  "Phantom Rovers", "Shulker Rangers", "Hoglin FC", "Zoglin United",
+  "Ravager City", "Pillager Athletic", "Witch Rovers", "Guardian Rangers",
+  "Elder Guardian FC", "Slime United", "Silverfish City", "Creaking Athletic"
+].map(name => ({ name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }));
+
+// Generated teams for Tier 3: Mob League One (24 Teams)
+const leagueOneTeams = [
+  "Zombie Pigman FC", "Iron Golem United", "Snow Golem City", "Enderman Athletic",
+  "Creeper Rovers", "Zombie Rangers", "Skeleton FC", "Spider United",
+  "Wolf City", "Ocelot Athletic", "Polar Bear Rovers", "Panda Rangers",
+  "Llama FC", "Goat United", "Fox City", "Bee Athletic",
+  "Strider Rovers", "Frog Rangers", "Axolotl FC", "Glow Squid United",
+  "Dolphin City", "Turtle Athletic", "Chicken Rovers", "Cow Rangers"
+].map(name => ({ name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }));
+
+function zoneForPos(pos, total, tier) {
+  // Tier 1: Mob League (20 Teams)
+  if (tier === 1) {
     if (pos === 1) return { key: "champ", label: "🏆 Champion" };
     if (pos >= 2 && pos <= 4) return { key: "qual", label: "✅ Qualifier" };
     if (pos >= 5 && pos <= 8) return { key: "play", label: "🎯 Playoff" };
-    if (pos >= 14 && pos <= 16) return { key: "rel", label: "⬇ Relegation" };
+    if (pos >= 18) return { key: "rel", label: "⬇ Relegation" }; // Bottom 3 of 20
     return { key: "norm", label: "— Normal" };
   }
   
-  // DIVISION 2 RULES
-  if (division === 2) {
+  // Tier 2: Mob Championship (24 Teams)
+  if (tier === 2) {
     if (pos >= 1 && pos <= 3) return { key: "prom", label: "⬆ Promotion" };
-    if (pos >= 4 && pos <= 6) return { key: "play", label: "🎯 Promotion Playoff" };
-    if (pos >= 14 && pos <= 16) return { key: "rel", label: "⬇ Relegation" };
+    if (pos >= 4 && pos <= 6) return { key: "play", label: "🎯 Promo Playoff" };
+    if (pos >= 22) return { key: "rel", label: "⬇ Relegation" }; // Bottom 3 of 24
     return { key: "norm", label: "— Normal" };
   }
 
-  // DIVISION 3 RULES
-  if (division === 3) {
+  // Tier 3: Mob League One (24 Teams)
+  if (tier === 3) {
     if (pos >= 1 && pos <= 3) return { key: "prom", label: "⬆ Promotion" };
-    if (pos >= 4 && pos <= 6) return { key: "play", label: "🎯 Promotion Playoff" };
+    if (pos >= 4 && pos <= 6) return { key: "play", label: "🎯 Promo Playoff" };
     return { key: "norm", label: "— Normal" };
   }
 
@@ -32,62 +52,60 @@ function zoneForPos(pos, total, division) {
 }
 
 export async function renderPage() {
-  const allTeams = await fetchTeams();
+  // Fetch tier 1 teams dynamically from backend database
+  const tier1Teams = await fetchTeams();
+  
+  let currentTeams = [];
+  let tierName = "";
+  let legendHtml = "";
 
-  // Filter teams for the active division.
-  // Fallback: If your team objects don't have a '.division' key yet, 
-  // this splits your massive list into groups of 16 for testing!
-  const filteredTeams = allTeams.filter(t => {
-    if (t.division !== undefined) {
-      return Number(t.division) === activeDivision;
-    }
-    // Fallback logic split:
-    if (activeDivision === 1) return allTeams.indexOf(t) < 16;
-    if (activeDivision === 2) return allTeams.indexOf(t) >= 16 && allTeams.indexOf(t) < 32;
-    return allTeams.indexOf(t) >= 32;
-  });
-
-  const total = filteredTeams.length || 16;
-
-  // Build the Division Navigation Bar with CSS styling matching your design
-  const navHtml = `
-    <div class="row" style="gap: 8px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 12px; width: 100%;">
-      <button class="btn ${activeDivision === 1 ? 'primary' : ''}" id="btnDiv1">Division 1</button>
-      <button class="btn ${activeDivision === 2 ? 'primary' : ''}" id="btnDiv2">Division 2</button>
-      <button class="btn ${activeDivision === 3 ? 'primary' : ''}" id="btnDiv3">Division 3</button>
-    </div>
-  `;
-
-  // Build key indicator legends based on the active division
-  let legendHtml = '';
-  if (activeDivision === 1) {
+  // Assign datasets and custom UI elements based on selection
+  if (activeTier === 1) {
+    currentTeams = tier1Teams;
+    tierName = "Mob League";
     legendHtml = `
       <span class="tag">🏆 Champion (1st)</span>
       <span class="tag">✅ Mob Royale Qualifiers (2–4)</span>
       <span class="tag">🎯 Mob Royale Playoffs (5–8)</span>
-      <span class="tag">— Normal (9–13)</span>
-      <span class="tag">⬇ Relegation (14–16)</span>
+      <span class="tag">— Normal (9–17)</span>
+      <span class="tag">⬇ Relegation (18–20)</span>
     `;
-  } else if (activeDivision === 2) {
+  } else if (activeTier === 2) {
+    currentTeams = championshipTeams;
+    tierName = "Mob Championship";
     legendHtml = `
-      <span class="tag">⬆ Promotion (1st–3rd)</span>
+      <span class="tag">⬆ Promotion to Mob League (1st–3rd)</span>
       <span class="tag">🎯 Promotion Playoffs (4th–6th)</span>
-      <span class="tag">— Normal (7th–13th)</span>
-      <span class="tag">⬇ Relegation (14th–16)</span>
+      <span class="tag">— Normal (7th–21st)</span>
+      <span class="tag">⬇ Relegation to League One (22nd–24th)</span>
     `;
   } else {
+    currentTeams = leagueOneTeams;
+    tierName = "Mob League One";
     legendHtml = `
-      <span class="tag">⬆ Promotion (1st–3rd)</span>
+      <span class="tag">⬆ Promotion to Championship (1st–3rd)</span>
       <span class="tag">🎯 Promotion Playoffs (4th–6th)</span>
-      <span class="tag">— Normal (7th+)</span>
+      <span class="tag">— Normal (7th–24th)</span>
     `;
   }
+
+  const total = currentTeams.length;
+
+  // Render navigation bar component inline using existing styling classes
+  const navHtml = `
+    <div class="row" style="gap: 8px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 12px; width: 100%;">
+      <button class="btn ${activeTier === 1 ? 'primary' : ''}" id="btnTier1">Mob League</button>
+      <button class="btn ${activeTier === 2 ? 'primary' : ''}" id="btnTier2">Mob Championship</button>
+      <button class="btn ${activeTier === 3 ? 'primary' : ''}" id="btnTier3">Mob League One</button>
+    </div>
+  `;
 
   $("page").innerHTML = `
     ${navHtml}
 
     <div class="row">
-      <h2 style="margin-right:auto;">Division ${activeDivision} Table</h2>
+      <h2 style="margin-right:auto;">${tierName} Table</h2>
+      <span class="pill small">Teams: ${total}</span>
     </div>
 
     <div class="stack" style="margin:10px 0;">
@@ -105,9 +123,9 @@ export async function renderPage() {
         </tr>
       </thead>
       <tbody>
-        ${filteredTeams.map((t, i) => {
+        ${currentTeams.map((t, i) => {
           const pos = i + 1;
-          const z = zoneForPos(pos, total, activeDivision);
+          const z = zoneForPos(pos, total, activeTier);
           return `
             <tr>
               <td>${pos}</td>
@@ -128,8 +146,8 @@ export async function renderPage() {
     </table>
   `;
 
-  // Attach dynamic event listeners to toggle between divisions smoothly
-  document.getElementById("btnDiv1").addEventListener("click", () => { activeDivision = 1; renderPage(); });
-  document.getElementById("btnDiv2").addEventListener("click", () => { activeDivision = 2; renderPage(); });
-  document.getElementById("btnDiv3").addEventListener("click", () => { activeDivision = 3; renderPage(); });
+  // Attach interactive click listeners back to buttons
+  document.getElementById("btnTier1").addEventListener("click", () => { activeTier = 1; renderPage(); });
+  document.getElementById("btnTier2").addEventListener("click", () => { activeTier = 2; renderPage(); });
+  document.getElementById("btnTier3").addEventListener("click", () => { activeTier = 3; renderPage(); });
 }
