@@ -3,116 +3,346 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Mob Profile Manager</title>
+  <title>Mob Team Profile Dashboard</title>
   <style>
-    :root { --bg:#0b0f14; --card:#121a24; --text:#e7eefc; --muted:#98a6bf; --accent:#4aa3ff; --danger:#ff4a4a; --ok:#3dff8b; }
-    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
-    body { margin: 0; background: var(--bg); color: var(--text); padding: 20px; }
-    .wrap { max-width: 1200px; margin: 0 auto; display: grid; gap: 20px; }
-    
-    /* Header Area Layout */
-    header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 15px; }
-    .team-title { display: flex; align-items: center; gap: 15px; }
-    .ai-logo { width: 64px; height: 64px; border-radius: 14px; background: radial-gradient(circle, #243b55, #141e30); display: flex; align-items: center; justify-content: center; font-size: 32px; border: 2px solid var(--accent); box-shadow: 0 0 10px rgba(74,163,255,0.3); }
-    .manager-badge { display: flex; align-items: center; gap: 10px; background: var(--card); padding: 8px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.08); }
+    :root {
+      --bg: #0b0f14;
+      --card: #121a24;
+      --card-alt: #16222f;
+      --text: #e7eefc;
+      --muted: #98a6bf;
+      --accent: #4aa3ff;
+      --danger: #ff4a4a;
+      --ok: #3dff8b;
+      --pitch-green: #155928;
+    }
 
-    /* Core Layout Sections */
-    .profile-grid { display: grid; grid-template-columns: 1fr; gap: 20px; }
-    @media (min-width: 900px) { .profile-grid { grid-template-columns: 300px 1fr 350px; } }
-    
-    .card { background: var(--card); border: 1px solid rgba(255,255,255,.08); border-radius: 18px; padding: 18px; }
-    h3 { margin: 0 0 12px 0; font-size: 16px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); border-bottom: 1px solid rgba(255,255,255,.06); padding-bottom: 6px;}
-    
-    /* Left: Player Sidebar List */
-    .player-list { display: grid; gap: 8px; max-height: 550px; overflow-y: auto; padding-right: 4px; }
-    .player-row { display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.15); padding: 8px; border-radius: 10px; border: 1px solid rgba(255,255,255,.04); }
-    .player-img { width: 36px; height: 36px; background: rgba(255,255,255,0.05); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    * {
+      box-sizing: border-box;
+      font-family: system-ui, -apple-system, sans-serif;
+    }
 
-    /* Center: Bio & Trophies */
-    .bio-box { font-size: 14px; line-height: 1.6; color: var(--text); margin-bottom: 20px; background: rgba(0,0,0,0.15); padding: 12px; border-radius: 12px; }
-    .trophy-shelf { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; }
-    .trophy-item { background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 10px; text-align: center; flex: 1; min-width: 90px; }
-    .trophy-icon { font-size: 24px; margin-bottom: 4px; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      padding: 24px;
+    }
 
-    /* Right: Interactive Formation Pitch */
-    .pitch { background: #1e4620; border: 3px solid rgba(255,255,255,0.2); border-radius: 14px; height: 320px; position: relative; overflow: hidden; margin-bottom: 15px; box-shadow: inset 0 0 40px rgba(0,0,0,0.5); }
-    .pitch-line { position: absolute; border: 1px solid rgba(255,255,255,0.2); }
-    .pitch-center { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 70px; height: 70px; border-radius: 50%; }
-    .pitch-half { top: 50%; left: 0; right: 0; height: 1px; }
-    .pitch-box { bottom: 0; left: 50%; transform: translateX(-50%); width: 140px; height: 50px; border-top: 1px solid rgba(255,255,255,0.2); }
-    
-    .pitch-player { position: absolute; display: flex; flex-direction: column; align-items: center; transform: translateX(-50%); }
-    .pitch-dot { width: 14px; height: 14px; background: var(--accent); border: 2px solid white; border-radius: 50%; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
-    .pitch-pname { font-size: 10px; background: rgba(0,0,0,0.75); padding: 2px 4px; border-radius: 4px; margin-top: 2px; white-space: nowrap; font-weight: bold; }
+    .wrap {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
 
-    /* Right: Current Season Standings Block */
-    .stats-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,.04); font-size: 13px; }
-    .stats-row span:last-child { font-weight: bold; color: var(--accent); }
-    .btn-back { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: var(--text); padding: 8px 14px; border-radius: 10px; cursor: pointer; text-decoration: none; font-size: 13px; }
-    .btn-back:hover { background: rgba(255,255,255,0.05); }
+    /* Top Layout Header styling matching the image blueprint */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 16px;
+      padding: 16px 24px;
+    }
+
+    .team-title-box {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+    }
+
+    .ai-logo-frame {
+      width: 72px;
+      height: 72px;
+      border-radius: 16px;
+      background: radial-gradient(circle, #2a3d54, #111a24);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 38px;
+      border: 2px solid var(--accent);
+      box-shadow: 0 0 15px rgba(74, 163, 255, 0.25);
+    }
+
+    .manager-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card-alt);
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, .05);
+    }
+
+    /* Core Three-Column Grid Setup */
+    .dashboard-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 20px;
+    }
+
+    @media (min-width: 1024px) {
+      .dashboard-grid {
+        grid-template-columns: 320px 1fr 400px;
+      }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid rgba(255, 255, 255, .06);
+      border-radius: 16px;
+      padding: 20px;
+    }
+
+    h3 {
+      margin: 0 0 16px 0;
+      font-size: 14px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--muted);
+      border-bottom: 1px solid rgba(255, 255, 255, .06);
+      padding-bottom: 8px;
+    }
+
+    /* Left Sidebar: Scrollable Players List */
+    .player-scroll-box {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 620px;
+      overflow-y: auto;
+      padding-right: 6px;
+    }
+
+    /* Customized Scrollbar styling */
+    .player-scroll-box::-webkit-scrollbar { width: 6px; }
+    .player-scroll-box::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); border-radius: 4px; }
+    .player-scroll-box::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+
+    .player-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--card-alt);
+      padding: 10px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, .03);
+    }
+
+    .player-avatar {
+      width: 42px;
+      height: 42px;
+      background: rgba(255, 255, 255, 0.04);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+
+    /* Center Pane: Bio Description and Trophies Storage Shelf */
+    .biography-text {
+      font-size: 14px;
+      line-height: 1.6;
+      color: var(--text);
+      background: rgba(0, 0, 0, 0.15);
+      padding: 16px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      border: 1px solid rgba(255, 255, 255, 0.02);
+    }
+
+    .trophy-rack {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+      gap: 12px;
+    }
+
+    .trophy-case-item {
+      background: var(--card-alt);
+      border: 1px solid rgba(255, 255, 255, .04);
+      border-radius: 12px;
+      padding: 12px 6px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .trophy-visual {
+      font-size: 28px;
+      margin-bottom: 6px;
+      filter: drop-shadow(0 2px 5px rgba(0,0,0,0.3));
+    }
+
+    /* Right Column: Dynamic Tactical Field Pitch Map styling */
+    .soccer-pitch {
+      background: var(--pitch-green);
+      background-image: 
+        radial-gradient(circle at center, transparent 34px, rgba(255,255,255,0.15) 35px, transparent 36px),
+        linear-gradient(to bottom, rgba(255,255,255,0.15) 1px, transparent 1px);
+      background-size: 100% 100%, 100% 10%;
+      border: 2px solid rgba(255, 255, 255, 0.25);
+      border-radius: 14px;
+      height: 380px;
+      position: relative;
+      margin-bottom: 20px;
+      box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.6);
+    }
+
+    .pitch-penalty-box {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 180px;
+      height: 60px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      border-bottom: none;
+    }
+
+    .pitch-node-player {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      transform: translateX(-50%);
+      z-index: 2;
+    }
+
+    .pitch-marker-dot {
+      width: 14px;
+      height: 14px;
+      background: var(--accent);
+      border: 2px solid #ffffff;
+      border-radius: 50%;
+      box-shadow: 0 3px 6px rgba(0,0,0,0.4);
+    }
+
+    .pitch-label-name {
+      font-size: 10px;
+      background: rgba(11, 15, 20, 0.85);
+      color: #fff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-top: 4px;
+      white-space: nowrap;
+      font-weight: 600;
+      border: 1px solid rgba(255,255,255,0.1);
+    }
+
+    /* Live Stat Row Data List */
+    .stats-data-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .data-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, .04);
+      font-size: 13px;
+    }
+
+    .data-row span:first-child {
+      color: var(--muted);
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 0.3px;
+    }
+
+    .data-row span:last-child {
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .back-nav-btn {
+      display: inline-block;
+      background: var(--card-alt);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text);
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      text-decoration: none;
+      font-size: 13px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .back-nav-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--accent);
+    }
   </style>
 </head>
 <body>
 
 <div class="wrap">
   <header>
-    <div class="team-title">
-      <div class="ai-logo" id="teamLogo">👾</div>
+    <div class="team-title-box">
+      <div class="ai-logo-frame" id="teamLogo">👾</div>
       <div>
-        <h1 id="teamHeaderName" style="margin:0; font-size:26px; font-weight:800;">Loading Team...</h1>
-        <div class="small" style="color:var(--muted); margin-top:2px;">AI Personalized Profile Generation</div>
+        <h1 id="teamHeaderName" style="margin:0; font-size:28px; font-weight:800; letter-spacing:-0.5px;">LOADING TEAM...</h1>
+        <div style="font-size:12px; color:var(--muted); margin-top:3px; font-weight:500;">Tactical Squad Management View</div>
       </div>
     </div>
-    <div class="manager-badge">
-      <div style="font-size: 20px;">👤</div>
-      <div style="text-align: right;">
-        <div style="font-size: 10px; color: var(--muted); text-transform: uppercase;">Manager</div>
-        <div id="managerName" style="font-size: 13px; font-weight: bold;">The Overlord</div>
+    <div class="manager-profile">
+      <div style="font-size: 24px;">👔</div>
+      <div>
+        <div style="font-size: 9px; color: var(--muted); text-transform: uppercase; font-weight:700; letter-spacing:0.5px;">Team Manager</div>
+        <div id="managerName" style="font-size: 14px; font-weight: 700; color: #fff;">System AI</div>
       </div>
     </div>
   </header>
 
-  <div class="profile-grid">
+  <div class="dashboard-grid">
     <aside class="card">
-      <h3>Squad Players</h3>
-      <div class="player-list" id="playerListWrapper"></div>
+      <h3>Active Squad Players</h3>
+      <div class="player-scroll-box" id="playerListWrapper"></div>
     </aside>
 
     <main class="card">
       <h3>Team Biography</h3>
-      <div class="bio-box" id="teamBio"></div>
+      <div class="biography-text" id="teamBio"></div>
 
-      <h3>Honours & Trophies</h3>
-      <div class="trophy-shelf" id="trophyShelf"></div>
+      <h3>Honours & Trophy Case</h3>
+      <div class="trophy-rack" id="trophyShelf"></div>
     </main>
 
-    <section style="display: grid; gap: 20px; align-content: start;">
+    <section style="display: flex; flex-direction: column; gap: 20px;">
       <div class="card">
-        <h3>Team Formation (4-3-3)</h3>
-        <div class="pitch">
-          <div class="pitch-line pitch-center"></div>
-          <div class="pitch-line pitch-half"></div>
-          <div class="pitch-line pitch-box"></div>
+        <h3>Team Line-Up (4-3-3)</h3>
+        <div class="soccer-pitch">
+          <div class="pitch-penalty-box"></div>
           
-          <div class="pitch-player" style="bottom: 8%; left: 50%;"><div class="pitch-dot" style="background:#ffcc00;"></div><div class="pitch-pname" id="pos-gk">GK</div></div>
-          <div class="pitch-player" style="bottom: 25%; left: 35%;"><div class="pitch-dot"></div><div class="pitch-pname" id="pos-cb1">CB</div></div>
-          <div class="pitch-player" style="bottom: 25%; left: 65%;"><div class="pitch-dot"></div><div class="pitch-pname" id="pos-cb2">CB</div></div>
-          <div class="pitch-player" style="bottom: 32%; left: 15%;"><div class="pitch-dot"></div><div class="pitch-pname" id="pos-lb">LB</div></div>
-          <div class="pitch-player" style="bottom: 32%; left: 85%;"><div class="pitch-dot"></div><div class="pitch-pname" id="pos-rb">RB</div></div>
-          <div class="pitch-player" style="bottom: 52%; left: 50%;"><div class="pitch-dot"></div><div class="pitch-pname" id="pos-cm">CM</div></div>
-          <div class="pitch-player" style="bottom: 58%; left: 25%;"><div class="pitch-dot"></div><div class="pitch-pname" id="pos-lm">LM</div></div>
-          <div class="pitch-player" style="bottom: 58%; left: 75%;"><div class="pitch-dot"></div><div class="pitch-pname" id="pos-rm">RM</div></div>
-          <div class="pitch-player" style="bottom: 82%; left: 50%;"><div class="pitch-dot" style="background:var(--danger);"></div><div class="pitch-pname" id="pos-st">ST</div></div>
-          <div class="pitch-player" style="bottom: 78%; left: 20%;"><div class="pitch-dot" style="background:var(--danger);"></div><div class="pitch-pname" id="pos-lw">LW</div></div>
-          <div class="pitch-player" style="bottom: 78%; left: 80%;"><div class="pitch-dot" style="background:var(--danger);"></div><div class="pitch-pname" id="pos-rw">RW</div></div>
+          <div class="pitch-node-player" style="bottom: 6%; left: 50%;"><div class="pitch-marker-dot" style="background:#ffb703;"></div><div class="pitch-label-name" id="pos-gk">GK</div></div>
+          <div class="pitch-node-player" style="bottom: 22%; left: 33%;"><div class="pitch-marker-dot"></div><div class="pitch-label-name" id="pos-cb1">CB</div></div>
+          <div class="pitch-node-player" style="bottom: 22%; left: 67%;"><div class="pitch-marker-dot"></div><div class="pitch-label-name" id="pos-cb2">CB</div></div>
+          <div class="pitch-node-player" style="bottom: 28%; left: 14%;"><div class="pitch-marker-dot"></div><div class="pitch-label-name" id="pos-lb">LB</div></div>
+          <div class="pitch-node-player" style="bottom: 28%; left: 86%;"><div class="pitch-marker-dot"></div><div class="pitch-label-name" id="pos-rb">RB</div></div>
+          <div class="pitch-node-player" style="bottom: 50%; left: 50%;"><div class="pitch-marker-dot"></div><div class="pitch-label-name" id="pos-cm">CM</div></div>
+          <div class="pitch-node-player" style="bottom: 54%; left: 24%;"><div class="pitch-marker-dot"></div><div class="pitch-label-name" id="pos-lm">LM</div></div>
+          <div class="pitch-node-player" style="bottom: 54%; left: 76%;"><div class="pitch-marker-dot"></div><div class="pitch-label-name" id="pos-rm">RM</div></div>
+          <div class="pitch-node-player" style="bottom: 82%; left: 50%;"><div class="pitch-marker-dot" style="background:var(--danger);"></div><div class="pitch-label-name" id="pos-st">ST</div></div>
+          <div class="pitch-node-player" style="bottom: 76%; left: 18%;"><div class="pitch-marker-dot" style="background:var(--danger);"></div><div class="pitch-label-name" id="pos-lw">LW</div></div>
+          <div class="pitch-node-player" style="bottom: 76%; left: 82%;"><div class="pitch-marker-dot" style="background:var(--danger);"></div><div class="pitch-label-name" id="pos-rw">RW</div></div>
         </div>
       </div>
 
       <div class="card">
         <h3>Current Season Stats</h3>
-        <div id="statsContainer"></div>
-        <div style="margin-top:15px; text-align:right;">
-          <a href="./index.html" class="btn-back">← Back to Standings</a>
+        <div class="stats-data-list" id="statsContainer"></div>
+        <div style="margin-top: 20px; text-align: right;">
+          <a href="./index.html" class="back-nav-btn">← Back to Standings</a>
         </div>
       </div>
     </section>
@@ -120,25 +350,46 @@
 </div>
 
 <script type="module">
-  // Read target setup name out of page route strings
+  // Pull live query string arguments down out of page addresses 
   const params = new URLSearchParams(window.location.search);
-  const teamName = params.get("name") || "Creeper Town United";
+  const teamName = params.get("name") || "Foxes";
+  const liveRank = params.get("rank") || "N/A";
+  const liveTier = params.get("tier") || "Mob League";
+  const liveZone = params.get("zone") || "Normal Position";
+  const liveGf = params.get("gf") || "0";
+  const liveGa = params.get("ga") || "0";
+  const livePts = params.get("pts") || "0";
 
-  // Clean root singular word form tags out of team arrays to structure naming scripts
+  // Isolate the base singular mob name to map appropriate artwork
   const baseName = teamName.replace(/(FC|United|Athletic|Rovers|Rangers|City|Town|Albion)/g, "").trim();
-  const rootMob = baseName.replace(/s$/, ""); // e.g. "Creepers" -> "Creeper"
+  const rootMob = baseName.replace(/s$/, ""); 
 
-  // 1. AI THEMED ICON GENERATOR
+  // Minecraft complete cross-division emoji dictionary reference mapper 
   const mobIcons = {
-    "Creeper": "💣", "Zombie": "🧟", "Skeleton": "💀", "Enderman": "🔮", "Warden": "🔊",
-    "Fox": "🦊", "Wolf": "🐺", "Wither": "☠️", "Spider": "🕷️", "Slime": "🟢", "Pig": "🐷"
+    "Fox": "🦊", "Wolf": "🐺", "Creeper": "💣", "Endermite": "🔮", "Iron Golem": "🤖",
+    "Wither Skeleton": "💀", "Cow": "🐮", "Snowman": "⛄", "Zombie": "🧟", "Axolotl": "🦎", 
+    "Spider": "🕷️", "Ocelot": "🐈", "Endermen": "👁️", "Pillager": "🏹", "Pig": "🐷", 
+    "The Warden": "🔊", "Villager": "💼", "Piglin": "🐖", "Chicken": "🐔", "Feesh": "🐟", 
+    "Skeleton": "☠️", "Elder Guardian": "🐡", "Evoker": "🧙‍♂️", "Vindicator": "🪓", "Blaze": "🔥",
+    "Ghast": "👻", "Hoglin": "🐗", "Zoglin": "🐗", "Ravager": "🐂", "Witch": "🧙‍♀️",
+    "Magma Cube": "🌋", "Cave Spider": "🕷️", "Stray": "🏹", "Phantom": "🦇", "Shulker": "📦",
+    "Silverfish": "🐛", "The Creaking": "🪵", "Piglin Brute": "🪓", "Vex": "🧚", "Guardian": "🐡",
+    "Mooshroom": "🍄", "Strider": "👾", "Allay": "🧚", "Sniffer": "🦖", "Zombie Villager": "🧟",
+    "Glow Squid": "🦑", "Dolphin": "🐬", "Sea Turtle": "🐢", "Frog": "🐸", "Puna": "🐱",
+    "Polar Bear": "🐻", "Llama": "🦙", "Trader Llama": "🦙", "Goat": "🐐", "Bat": "🦇",
+    "Parrots": "🦜", "Donkey": "🫏", "Mule": "🫏", "Camel": "🐫", "Armadillo": "🛡️",
+    "Breeze": "🌪️", "Bogged Skeleton": "🍄", "Cat": "🐈", "Puffer": "🐡", "Salmon City": "🐟",
+    "Cod United": "🐟", "Bee": "🐝"
   };
-  document.getElementById("teamLogo").textContent = mobIcons[rootMob] || "👾";
-  document.getElementById("teamHeaderName").textContent = teamName.toUpperCase();
-  document.getElementById("managerName").textContent = `The ${rootMob} Master`;
 
-  // 2. GENERATING UNIQUE THEMED SQUAD PLAYERS
-  const playerPrefixes = ["Giant", "Altered", "Mega", "Stalker", "Sneaky", "Aggressive", "Shadow", "Mutant", "Alpha", "Hyper", "Elite"];
+  const selectedIcon = mobIcons[rootMob] || mobIcons[baseName] || "👾";
+  
+  document.getElementById("teamLogo").textContent = selectedIcon;
+  document.getElementById("teamHeaderName").textContent = teamName.toUpperCase();
+  document.getElementById("managerName").textContent = `The ${rootMob} Trainer`;
+
+  // Dynamic procedural name arrays mapping
+  const playerPrefixes = ["Captain", "Striker", "Alpha", "Slayer", "Shadow", "Titan", "Phantom", "Rogue", "Glitch", "Mutant", "Hunter"];
   const positions = [
     { pos: "GK", id: "pos-gk" }, { pos: "DF", id: "pos-lb" }, { pos: "DF", id: "pos-cb1" },
     { pos: "DF", id: "pos-cb2" }, { pos: "DF", id: "pos-rb" }, { pos: "MF", id: "pos-lm" },
@@ -149,44 +400,41 @@
   let playerListHtml = "";
   positions.forEach((p, index) => {
     const pName = `${playerPrefixes[(index + baseName.length) % playerPrefixes.length]} ${rootMob}`;
-    
-    // Add to list column layout
     playerListHtml += `
-      <div class="player-row">
-        <div class="player-img">${mobIcons[rootMob] || "⚔️"}</div>
+      <div class="player-card">
+        <div class="player-avatar">${selectedIcon}</div>
         <div style="flex:1;">
-          <div style="font-size:13px; font-weight:bold;">${pName}</div>
-          <div style="font-size:11px; color:var(--muted);">${p.pos}</div>
+          <div style="font-size:13px; font-weight:bold; color:#fff;">${pName}</div>
+          <div style="font-size:11px; color:var(--muted); font-weight:500; margin-top:1px;">${p.pos}</div>
         </div>
       </div>
     `;
-
-    // Inject directly onto the tactics field line dots
     const fieldLabel = document.getElementById(p.id);
     if (fieldLabel) fieldLabel.textContent = pName;
   });
   document.getElementById("playerListWrapper").innerHTML = playerListHtml;
 
-  // 3. AI THEMED BIOGRAPHY
+  // Custom Character Biography string generation
   document.getElementById("teamBio").textContent = `
-    Founded in the depths of the Minecraft biomes, ${teamName} has established an absolute reign of terror in the league. 
-    Known for utilizing native ${rootMob} attributes to surprise opposing setups, their tactical focus relies completely on absolute power and swarm maneuvers.
-    This profile layout, along with the rosters and history records, has been cleanly assembled via dynamic engine presets.
+    Competing with pride within the ${liveTier}, ${teamName} are currently holding down placement slot rank #${liveRank} across the general standings ladder. 
+    By adapting custom evolutionary traits specific to the native ${baseName} archetype, their current roster has established an aggressive tactical framework that remains highly unpredictable on matchdays.
   `;
 
-  // 4. ACHIEVEMENTS & HISTORICAL RECORD GENERATION
+  // Trophy list configuration mapping
   document.getElementById("trophyShelf").innerHTML = `
-    <div class="trophy-item"><div class="trophy-icon">🏆</div><div style="font-size:11px; font-weight:bold;">Season 1</div><div style="font-size:9px; color:var(--muted);">Champ</div></div>
-    <div class="trophy-item"><div class="trophy-icon">👑</div><div style="font-size:11px; font-weight:bold;">Royale Cup</div><div style="font-size:9px; color:var(--muted);">Winner</div></div>
-    <div class="trophy-item"><div class="trophy-icon">🛡️</div><div style="font-size:11px; font-weight:bold;">Supercup</div><div style="font-size:9px; color:var(--muted);">Finalist</div></div>
+    <div class="trophy-case-item"><div class="trophy-visual">🏆</div><div style="font-size:11px; font-weight:700;">Rank Tier</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">#${liveRank} Overall</div></div>
+    <div class="trophy-case-item"><div class="trophy-visual">⚡</div><div style="font-size:11px; font-weight:700;">Performance</div><div style="font-size:10px; color:var(--muted); margin-top:2px;">${livePts} Points</div></div>
+    <div class="trophy-case-item"><div class="trophy-visual">🛡️</div><div style="font-size:11px; font-weight:700;">Zone Placement</div><div style="font-size:10px; color:var(--muted); margin-top:2px; white-space:nowrap; max-width:95px; overflow:hidden;">${liveZone}</div></div>
   `;
 
-  // 5. SEASON STAT TRACKING
+  // Append live statistical metrics out of URL parameters variables onto UI items
   document.getElementById("statsContainer").innerHTML = `
-    <div class="stats-row"><span>League Tier</span><span>Dynamic Tier Placement</span></div>
-    <div class="stats-row"><span>Goals Scored</span><span>${25 + baseName.length * 3}</span></div>
-    <div class="stats-row"><span>Goals Conceded</span><span>${12 + baseName.length}</span></div>
-    <div class="stats-row"><span>Clean Sheets</span><span>${4 + (baseName.length % 4)}</span></div>
+    <div class="data-row"><span>League Standing</span><span># ${liveRank}</span></div>
+    <div class="data-row"><span>Active Tier</span><span>${liveTier}</span></div>
+    <div class="data-row"><span>Total Points</span><span>${livePts} Pts</span></div>
+    <div class="data-row"><span>Goals For (GF)</span><span>${liveGf}</span></div>
+    <div class="data-row"><span>Goals Against (GA)</span><span>${liveGa}</span></div>
+    <div class="data-row"><span>Zone Status</span><span>${liveZone}</span></div>
   `;
 </script>
 
