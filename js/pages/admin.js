@@ -127,6 +127,18 @@ export async function renderPage({ user } = {}) {
       <h3>Current Loaded League Roster</h3>
       <div id="teamList" class="stack"></div>
     </div>
+
+    <div style="height:16px"></div>
+
+    <div class="card" style="background: rgba(74, 163, 255, 0.05); border: 1px solid rgba(74, 163, 255, 0.25);">
+      <h3>📋 Export League Tables to Clipboard</h3>
+      <div class="muted small" style="margin-bottom: 12px;">Click a division to generate and copy a clean text table layout.</div>
+      <div class="row" style="gap:10px;">
+        <button class="btn" id="copyT1" style="background:#4aa3ff; color:white; font-weight:bold;">📋 Copy Mob League (Tier 1)</button>
+        <button class="btn" id="copyT2" style="background:#4aa3ff; color:white; font-weight:bold;">📋 Copy Mob Championship (Tier 2)</button>
+        <button class="btn" id="copyT3" style="background:#4aa3ff; color:white; font-weight:bold;">📋 Copy Mob League One (Tier 3)</button>
+      </div>
+    </div>
   `;
 
   $("bulkTeams").value = DEFAULT_TEAMS;
@@ -148,14 +160,13 @@ export async function renderPage({ user } = {}) {
     localStorage.setItem("mob_news_feed", JSON.stringify(feed));
   }
 
-  // Helper template renderer to turn short code arrays into beautiful form dots
   function renderFormCircles(formArray) {
     if (!Array.isArray(formArray) || formArray.length === 0) {
       return `<span style="color:rgba(255,255,255,0.2); font-size:12px;">No matches played</span>`;
     }
     return `<div style="display:inline-flex; gap:4px; vertical-align:middle; align-items:center;">
       ${formArray.slice(-5).map(result => {
-        let bg = "#757575"; // Draw/Default gray
+        let bg = "#757575";
         let symbol = "–";
         if (result === "W") { bg = "#2e7d32"; symbol = "✓"; }
         if (result === "L") { bg = "#c62828"; symbol = "✕"; }
@@ -181,16 +192,64 @@ export async function renderPage({ user } = {}) {
     return { goalsA, goalsB };
   }
 
-  // Update logic to maintain form history arrays
   function updateFormHistory(teamData, newResult) {
     if (!Array.isArray(teamData.form)) {
       teamData.form = [];
     }
     teamData.form.push(newResult);
     if (teamData.form.length > 5) {
-      teamData.form.shift(); // Keep only the last 5 games
+      teamData.form.shift();
     }
   }
+
+  // ================= EXPORT & CLIPBOARD GENERATOR ENGINE =================
+  function copyTableToClipboard(tierName) {
+    // Filter out and sort the matching division items
+    const filtered = teams
+      .filter(t => (tierName === "Mob League" ? (t.tier === "Mob League" || !t.tier) : t.tier === tierName))
+      .sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0));
+
+    if (filtered.length === 0) {
+      alert(`There are currently no clubs assigned to ${tierName}.`);
+      return;
+    }
+
+    // Header formatting grid line layout
+    let textOutput = `== ${tierName.toUpperCase()} TABLE ==\n`;
+    textOutput += `#  Team                     P   W   D   L   GF  GA  GD  Pts\n`;
+    textOutput += `-----------------------------------------------------------\n`;
+
+    filtered.forEach((t, i) => {
+      const pos = String(i + 1).padEnd(3, ' ');
+      const name = String(t.name).padEnd(24, ' ');
+      const p = String(t.played || 0).padEnd(4, ' ');
+      const w = String(t.won || 0).padEnd(4, ' ');
+      const d = String(t.drawn || 0).padEnd(4, ' ');
+      const l = String(t.lost || 0).padEnd(4, ' ');
+      const gf = String(t.gf || 0).padEnd(4, ' ');
+      const ga = String(t.ga || 0).padEnd(4, ' ');
+      const gd = String(t.gd || 0).padEnd(4, ' ');
+      const pts = String(t.points || 0);
+
+      textOutput += `${pos}${name}${p}${w}${d}${l}${gf}${ga}${gd}${pts}\n`;
+    });
+
+    // Write straight to native device navigator clipboard API
+    navigator.clipboard.writeText(textOutput)
+      .then(() => {
+        addNotification(`Copied ${tierName} standings to clipboard!`);
+        logToConsole(`Table string successfully bundled and exported for: ${tierName}.`);
+      })
+      .catch(err => {
+        console.error("Clipboard failed", err);
+        alert("Failed to copy table. Please verify browser window focus context permissions.");
+      });
+  }
+
+  // Bind export buttons to trigger events
+  document.getElementById("copyT1").onclick = () => copyTableToClipboard("Mob League");
+  document.getElementById("copyT2").onclick = () => copyTableToClipboard("Mob Championship");
+  document.getElementById("copyT3").onclick = () => copyTableToClipboard("Mob League One");
 
   // ================= SIMULATION EVENT WIRES =================
 
@@ -265,14 +324,11 @@ export async function renderPage({ user } = {}) {
     runLeagueSimulation(roundsValue);
   };
 
-  // ================= AUTOMATED PROMOTION & RELEGATION LIFE STAGE ENGINE =================
   document.getElementById("btnEndSeason").onclick = async () => {
     if (!confirm("Are you ready to conclude the season? This will automatically promote/relegate cross-division edge cases and reset points down to 0!")) return;
     
     logToConsole("Processing season termination data tables... Sorting positions inside division clusters...");
 
-    // Segregate active databases into internal structures
-    // Fallback default value to "Mob League" if no tier flag exists
     let tier1 = teams.filter(t => (t.tier === "Mob League" || !t.tier)).sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0));
     let tier2 = teams.filter(t => t.tier === "Mob Championship").sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0));
     let tier3 = teams.filter(t => t.tier === "Mob League One").sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0));
@@ -282,8 +338,6 @@ export async function renderPage({ user } = {}) {
     const batch = writeBatch(db);
     let logsUpdates = [];
 
-    // Rule 1: Relegate Bottom 3 from Mob League (Positions 18, 19, 20 assuming standard 20 team splits)
-    // Dynamic lookups allow flexibility regardless of total teams uploaded
     if (tier1.length > 3 && tier2.length > 0) {
       const relegatedFromT1 = tier1.slice(-3); 
       const promotedFromT2 = tier2.slice(0, 3);
@@ -299,7 +353,6 @@ export async function renderPage({ user } = {}) {
       });
     }
 
-    // Rule 2: Relegate Bottom 3 from Mob Championship to Mob League One
     if (tier2.length > 3 && tier3.length > 0) {
       const relegatedFromT2 = tier2.slice(-3);
       const promotedFromT3 = tier3.slice(0, 3);
@@ -315,25 +368,21 @@ export async function renderPage({ user } = {}) {
       });
     }
 
-    // Rule 3: Clear all scores/form to setup next season split
     teams.forEach(t => {
       batch.update(doc(db, "teams", t.id), {
         played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0,
-        form: [] // Empty form history for a fresh calendar year
+        form: []
       });
     });
 
     await batch.commit();
 
-    // Flash notifications and logging history outputs
     logsUpdates.forEach(m => logToConsole(m));
-    pushFakeNews("cup", "🔄 DIVISION RESET: Promotion & Relegation Settled!", "The league board has authorized seasonal tier changes. Lower seed surprise packages celebrate their dynamic class jumps.");
+    pushFakeNews("cup", "🔄 DIVISION RESET: Promotion & Relegation Settled!", "The league board has authorized seasonal tier changes.");
     
     logToConsole("All database points initialized back to zero. Fresh season calendars generated!");
     await renderPage({ user });
   };
-
-  // ================= EXISTING SIMULATION PORTS =================
 
   document.getElementById("btnSimCups").onclick = async () => {
     logToConsole("Assembling all 69 clubs across tiers for the World Mob Cup simulation standard...");
@@ -393,7 +442,7 @@ export async function renderPage({ user } = {}) {
         played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0,
         trophies: 0,
         stars: 3,
-        tier: "Mob League", // Baseline default division placement
+        tier: "Mob League",
         rivals: [],
         form: [],
         createdAt: serverTimestamp()
@@ -407,7 +456,6 @@ export async function renderPage({ user } = {}) {
     const list = $("teamList");
     list.innerHTML = "";
     
-    // Sort logic matching display criteria
     teams
       .slice()
       .sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0))
