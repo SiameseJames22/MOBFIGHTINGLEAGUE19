@@ -131,7 +131,11 @@ export async function renderPage() {
           return `
             <tr>
               <td>${pos}</td>
-              <td><strong>${escapeHtml(t.name)}</strong></td>
+              <td>
+                <a href="./team.html?name=${encodeURIComponent(t.name)}" class="link" style="font-weight: bold; text-decoration: none;">
+                  ${escapeHtml(t.name)}
+                </a>
+              </td>
               <td><span class="tag">${z.label}</span></td>
               <td>${t.played || 0}</td>
               <td>${t.won || 0}</td>
