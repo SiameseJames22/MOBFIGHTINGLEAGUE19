@@ -32,6 +32,7 @@ export async function renderPage({ user } = {}) {
     return;
   }
 
+  // Fetch the fresh set of live teams from your Firestore database collection
   const teams = await fetchTeams();
   const teamOptions = teams.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
 
@@ -202,9 +203,7 @@ export async function renderPage({ user } = {}) {
     }
   }
 
-  // ================= EXPORT & CLIPBOARD GENERATOR ENGINE =================
   function copyTableToClipboard(tierName) {
-    // Filter out and sort the matching division items
     const filtered = teams
       .filter(t => (tierName === "Mob League" ? (t.tier === "Mob League" || !t.tier) : t.tier === tierName))
       .sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0));
@@ -214,7 +213,6 @@ export async function renderPage({ user } = {}) {
       return;
     }
 
-    // Header formatting grid line layout
     let textOutput = `== ${tierName.toUpperCase()} TABLE ==\n`;
     textOutput += `#  Team                     P   W   D   L   GF  GA  GD  Pts\n`;
     textOutput += `-----------------------------------------------------------\n`;
@@ -234,7 +232,6 @@ export async function renderPage({ user } = {}) {
       textOutput += `${pos}${name}${p}${w}${d}${l}${gf}${ga}${gd}${pts}\n`;
     });
 
-    // Write straight to native device navigator clipboard API
     navigator.clipboard.writeText(textOutput)
       .then(() => {
         addNotification(`Copied ${tierName} standings to clipboard!`);
@@ -242,11 +239,10 @@ export async function renderPage({ user } = {}) {
       })
       .catch(err => {
         console.error("Clipboard failed", err);
-        alert("Failed to copy table. Please verify browser window focus context permissions.");
+        alert("Failed to copy table.");
       });
   }
 
-  // Bind export buttons to trigger events
   document.getElementById("copyT1").onclick = () => copyTableToClipboard("Mob League");
   document.getElementById("copyT2").onclick = () => copyTableToClipboard("Mob Championship");
   document.getElementById("copyT3").onclick = () => copyTableToClipboard("Mob League One");
@@ -380,37 +376,54 @@ export async function renderPage({ user } = {}) {
     logsUpdates.forEach(m => logToConsole(m));
     pushFakeNews("cup", "🔄 DIVISION RESET: Promotion & Relegation Settled!", "The league board has authorized seasonal tier changes.");
     
-    logToConsole("All database points initialized back to zero. Fresh season calendars generated!");
+    logToConsole("All database teams reset back to 0 points. A fresh pre-season is now active!");
     await renderPage({ user });
   };
 
+  // ================= REPAIRED CUP TOURNAMENT ENGINE =================
   document.getElementById("btnSimCups").onclick = async () => {
     logToConsole("Assembling all 69 clubs across tiers for the World Mob Cup simulation standard...");
+    
+    // 1. Gather all potential names across dynamic tiers
     const combined69Names = [...teams.map(t => t.name), ...TIER2_NAMES, ...TIER3_NAMES];
     const shuffledClubs = combined69Names.sort(() => Math.random() - 0.5);
 
     let cupWinner = shuffledClubs[0];
     let topStarRating = 0;
     
+    // 2. Select a winner from a pool weighted by stars 
     for (let i = 0; i < Math.min(6, shuffledClubs.length); i++) {
       const currentName = shuffledClubs[i];
-      const matchingLiveTeam = teams.find(t => t.name === currentName);
+      // Lookup match based strictly on name matching properties
+      const matchingLiveTeam = teams.find(t => t.name.toLowerCase() === currentName.toLowerCase());
       const teamStars = matchingLiveTeam ? (matchingLiveTeam.stars || 3) : 3;
+      
       if (teamStars + Math.random() * 2 > topStarRating) {
         topStarRating = teamStars;
         cupWinner = currentName;
       }
     }
 
+    // FIXED: Convert target name to lowercase-dashed document ID format
     const winnerId = slug(cupWinner);
+    // Find the live record inside your loaded array matching that exact generated ID string
     const winnerLiveMatch = teams.find(t => t.id === winnerId);
 
     if (winnerLiveMatch) {
       const currentTrophies = Number(winnerLiveMatch.trophies || 0);
-      await updateDoc(doc(db, "teams", winnerId), { trophies: currentTrophies + 1 });
-      logToConsole(`Firestore match found: Awarded +1 Trophy to ${cupWinner}.`);
+      const updatedTrophiesCount = currentTrophies + 1;
+      
+      // Update data point in Firestore database reference
+      await updateDoc(doc(db, "teams", winnerId), { trophies: updatedTrophiesCount });
+      
+      // FIXED: Directly update your local script memory array so it displays on render instantly!
+      winnerLiveMatch.trophies = updatedTrophiesCount;
+      logToConsole(`Firestore match found: Awarded +1 Trophy to ${winnerLiveMatch.name}. Total: ${updatedTrophiesCount}`);
+    } else {
+      logToConsole(`Notice: Cup won by ${cupWinner} (Tier 2/3 un-loaded fallback club).`);
     }
 
+    // Save tournament statistics to local storage for profiles
     let tournamentStats = JSON.parse(localStorage.getItem("mob_tourney_stats") || "{}");
     tournamentStats[cupWinner] = {
       lastTrophy: "🌎 World Mob Cup Winner (2026)",
@@ -419,6 +432,8 @@ export async function renderPage({ user } = {}) {
     localStorage.setItem("mob_tourney_stats", JSON.stringify(tournamentStats));
 
     pushFakeNews("cup", `🏆 WORLD MOB CUP FINALE: ${cupWinner} Crowned World Champions!`, `The final match tree concluded with ${cupWinner} lifting the trophy.`);
+    
+    // Re-render UI to update view logs
     await renderPage({ user });
   };
 
