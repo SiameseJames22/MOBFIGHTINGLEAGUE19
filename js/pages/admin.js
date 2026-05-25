@@ -1,5 +1,5 @@
 import { $, escapeHtml, fetchTeams, slug, ADMIN, addNotification, db } from "../app.js";
-import { deleteDoc, doc, serverTimestamp, setDoc, updateDoc, getDoc, collection, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
+import { deleteDoc, doc, serverTimestamp, setDoc, updateDoc, getDoc, writeBatch } from "https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js";
 
 const DEFAULT_TEAMS = `Chickens
 Cows
@@ -18,7 +18,6 @@ Villagers
 Wolves
 Zombies`;
 
-// Hardcoded Tier 2 + Tier 3 rosters to complement your live Tier 1 teams for the 69-club World Cup
 const TIER2_NAMES = ["Elder Guardians", "Evokers", "Vindicators", "Blazes", "Ghasts", "Hoglins", "Zoglins", "Ravagers", "Witches", "Magma Cubes", "Cave Spiders", "Husks", "Strays", "Phantoms", "Shulkers", "Silverfish", "The Creaking", "Piglin Brutes", "Vexes", "Guardians", "Mooshrooms", "Striders", "Allays", "Sniffers"];
 const TIER3_NAMES = ["Zombie Villagers", "Glow Squids", "Dolphins", "Sea Turtles", "Frogs", "Punas", "Polar Bears", "Ocelots", "Llamas", "Trader Llamas", "Goats", "Bats", "Parrots", "Donkeys", "Mules", "Camels", "Armadillos", "Breezes", "Bogged Skeletons", "Cats", "Puffers", "Salmon City", "Cod United", "Bees"];
 
@@ -29,7 +28,6 @@ export async function renderPage({ user } = {}) {
     $("page").innerHTML = `
       <h2>Admin</h2>
       <div class="banner"><strong>Access denied.</strong><div class="muted small">Only the admin can edit.</div></div>
-      <div class="muted small" style="margin-top:10px;">Your UID: <span class="mono">${escapeHtml(user?.uid || "—")}</span></div>
     `;
     return;
   }
@@ -37,7 +35,6 @@ export async function renderPage({ user } = {}) {
   const teams = await fetchTeams();
   const teamOptions = teams.map(t => `<option value="${t.id}">${escapeHtml(t.name)}</option>`).join("");
 
-  // Load current mobRoyale settings
   const sref = doc(db, "settings", "mobRoyale");
   const ssnap = await getDoc(sref);
   const sdata = ssnap.exists() ? ssnap.data() : {};
@@ -53,10 +50,10 @@ export async function renderPage({ user } = {}) {
       
       <div class="card">
         <h3>⚡ Mass Simulate League Matches</h3>
-        <p class="muted small">Simulates random match fixtures among all loaded database clubs. Weighted by Star Ratings.</p>
+        <p class="muted small">Simulates fixtures among database clubs. Dynamically builds 5-match form history tracker strings.</p>
         
         <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px;">
-          <label style="font-size: 12px; font-weight: bold; color: var(--accent);">Number of rounds to execute:</label>
+          <label style="font-size: 12px; font-weight: bold; color: #ffaa00;">Number of rounds to execute:</label>
           <input type="number" id="inputSimRounds" min="1" max="100" value="1" style="width: 100%; padding: 6px; font-size: 14px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 4px;">
         </div>
 
@@ -67,14 +64,14 @@ export async function renderPage({ user } = {}) {
 
       <div class="card">
         <h3>🏆 Cup Tournament Simulator</h3>
-        <p class="muted small">Simulates matches across the elite tournaments, tracks bracket stages, and pushes the winner straight to their team node.</p>
+        <p class="muted small">Simulates matches across elite tournaments, tracks bracket stages, and pushes the winner straight to their team node.</p>
         <button class="btn" id="btnSimCups" style="background: linear-gradient(135deg, #ffaa00, #ff5500); color:white; border:none; width:100%; margin-top:12px; font-weight:bold;">Run Tournaments & World Cup</button>
       </div>
 
       <div class="card">
-        <h3>⚠️ Reset & Conclude Season</h3>
-        <p class="muted small">Archives final positions, wipes standard points metrics down to 0, updates profiles, and sets up a fresh schedule.</p>
-        <button class="btn danger" id="btnEndSeason" style="width:100%; margin-top:12px;">Reset Tables for New Season</button>
+        <h3>🔄 Conclude Season (With Promotion & Relegation)</h3>
+        <p class="muted small">Calculates league boundaries. Automatically promotes top tier performers and drops bottom squads down divisions.</p>
+        <button class="btn danger" id="btnEndSeason" style="width:100%; margin-top:12px; background: #e65100;">Process Relegation & Reset Tables</button>
       </div>
 
     </div>
@@ -87,7 +84,7 @@ export async function renderPage({ user } = {}) {
     <div class="grid" style="grid-template-columns:1fr 1fr; gap:16px;">
       <div class="card">
         <h3>Bulk add teams</h3>
-        <div class="muted small">One team per line.</div>
+        <div class="muted small">One team per line. Defaults assign to Tier 1 ("Mob League").</div>
         <textarea id="bulkTeams" style="width:100%; margin-top:8px; min-height:110px;"></textarea>
         <div class="row" style="margin-top:10px;">
           <button class="btn primary" id="bulkAddBtn">Add / Update teams</button>
@@ -118,8 +115,8 @@ export async function renderPage({ user } = {}) {
     <div style="height:16px"></div>
 
     <div class="card">
-      <h3>Trophies, Stars & Rivals Editor</h3>
-      <div class="muted small">Configure dynamic squad performance profiles. Star ratings affect simulation parameters.</div>
+      <h3>Trophies, Tier Assignments & Rivals Editor</h3>
+      <div class="muted small">Manually override tiers, trophies, strength ratings, or modify rival configurations.</div>
       <div class="hr"></div>
       <div id="trophyList" class="stack" style="gap:12px;"></div>
     </div>
@@ -127,17 +124,15 @@ export async function renderPage({ user } = {}) {
     <div style="height:16px"></div>
 
     <div class="card">
-      <h3>Current loaded league roster</h3>
+      <h3>Current Loaded League Roster</h3>
       <div id="teamList" class="stack"></div>
     </div>
   `;
 
-  // Default value initializations
   $("bulkTeams").value = DEFAULT_TEAMS;
   $("wc1").value = wildcards[0] || "";
   $("wc2").value = wildcards[1] || "";
 
-  // Helper local logger output stream 
   function logToConsole(text) {
     const el = document.getElementById("adminConsole");
     if (el) {
@@ -146,7 +141,6 @@ export async function renderPage({ user } = {}) {
     }
   }
 
-  // Injector Pipeline for Breaking Fake News Headlines
   function pushFakeNews(type, title, body) {
     let feed = JSON.parse(localStorage.getItem("mob_news_feed") || "[]");
     feed.unshift({ type, title, body, time: "Just In" });
@@ -154,7 +148,23 @@ export async function renderPage({ user } = {}) {
     localStorage.setItem("mob_news_feed", JSON.stringify(feed));
   }
 
-  // Core Star Rating Weighted Match Simulation Logic
+  // Helper template renderer to turn short code arrays into beautiful form dots
+  function renderFormCircles(formArray) {
+    if (!Array.isArray(formArray) || formArray.length === 0) {
+      return `<span style="color:rgba(255,255,255,0.2); font-size:12px;">No matches played</span>`;
+    }
+    return `<div style="display:inline-flex; gap:4px; vertical-align:middle; align-items:center;">
+      ${formArray.slice(-5).map(result => {
+        let bg = "#757575"; // Draw/Default gray
+        let symbol = "–";
+        if (result === "W") { bg = "#2e7d32"; symbol = "✓"; }
+        if (result === "L") { bg = "#c62828"; symbol = "✕"; }
+        if (result === "D") { bg = "#ef6c00"; symbol = "●"; }
+        return `<span title="${result}" style="display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; border-radius:50%; background:${bg}; color:#fff; font-size:10px; font-weight:bold; font-family:sans-serif;">${symbol}</span>`;
+      }).join("")}
+    </div>`;
+  }
+
   function processMatchCalculation(teamA, teamB) {
     const starsA = Number(teamA.stars || 3);
     const starsB = Number(teamB.stars || 3);
@@ -171,16 +181,26 @@ export async function renderPage({ user } = {}) {
     return { goalsA, goalsB };
   }
 
+  // Update logic to maintain form history arrays
+  function updateFormHistory(teamData, newResult) {
+    if (!Array.isArray(teamData.form)) {
+      teamData.form = [];
+    }
+    teamData.form.push(newResult);
+    if (teamData.form.length > 5) {
+      teamData.form.shift(); // Keep only the last 5 games
+    }
+  }
+
   // ================= SIMULATION EVENT WIRES =================
 
-  // Dynamic Custom Match Simulator
   async function runLeagueSimulation(roundsCount) {
     if (teams.length < 2) return alert("Please load more teams before running simulations.");
     if (isNaN(roundsCount) || roundsCount < 1) return alert("Please specify a valid round number of 1 or more.");
     
     logToConsole(`Beginning verification for ${roundsCount} simulation match rounds...`);
     const batch = writeBatch(db);
-    let localTeamsMap = new Map(teams.map(t => [t.id, { ...t, stars: (t.stars || 3) }]));
+    let localTeamsMap = new Map(teams.map(t => [t.id, { ...t, stars: (t.stars || 3), form: Array.isArray(t.form) ? t.form : [] }]));
 
     for (let round = 0; round < roundsCount; round++) {
       let teamIds = Array.from(localTeamsMap.keys()).sort(() => Math.random() - 0.5);
@@ -203,12 +223,15 @@ export async function renderPage({ user } = {}) {
         if (goalsA > goalsB) {
           tA.won = (tA.won || 0) + 1; tB.lost = (tB.lost || 0) + 1;
           tA.points = (tA.points || 0) + 3;
+          updateFormHistory(tA, "W"); updateFormHistory(tB, "L");
         } else if (goalsB > goalsA) {
           tB.won = (tB.won || 0) + 1; tA.lost = (tA.lost || 0) + 1;
           tB.points = (tB.points || 0) + 3;
+          updateFormHistory(tA, "L"); updateFormHistory(tB, "W");
         } else {
           tA.drawn = (tA.drawn || 0) + 1; tB.drawn = (tB.drawn || 0) + 1;
           tA.points = (tA.points || 0) + 1; tB.points = (tB.points || 0) + 1;
+          updateFormHistory(tA, "D"); updateFormHistory(tB, "D");
         }
       }
     }
@@ -217,7 +240,8 @@ export async function renderPage({ user } = {}) {
       const ref = doc(db, "teams", id);
       batch.update(ref, {
         played: data.played, won: data.won, drawn: data.drawn, lost: data.lost,
-        gf: data.gf, ga: data.ga, gd: data.gd, points: data.points
+        gf: data.gf, ga: data.ga, gd: data.gd, points: data.points,
+        form: data.form
       });
     }
 
@@ -236,16 +260,83 @@ export async function renderPage({ user } = {}) {
     await renderPage({ user });
   }
 
-  // Binds the execution directly to the value of your custom input element
   document.getElementById("btnCustomSim").onclick = () => {
     const roundsValue = parseInt(document.getElementById("inputSimRounds").value, 10);
     runLeagueSimulation(roundsValue);
   };
 
-  // 2. Tournament Cups Simulation Execution Block
+  // ================= AUTOMATED PROMOTION & RELEGATION LIFE STAGE ENGINE =================
+  document.getElementById("btnEndSeason").onclick = async () => {
+    if (!confirm("Are you ready to conclude the season? This will automatically promote/relegate cross-division edge cases and reset points down to 0!")) return;
+    
+    logToConsole("Processing season termination data tables... Sorting positions inside division clusters...");
+
+    // Segregate active databases into internal structures
+    // Fallback default value to "Mob League" if no tier flag exists
+    let tier1 = teams.filter(t => (t.tier === "Mob League" || !t.tier)).sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0));
+    let tier2 = teams.filter(t => t.tier === "Mob Championship").sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0));
+    let tier3 = teams.filter(t => t.tier === "Mob League One").sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0));
+
+    logToConsole(`Initial state: Tier 1 (${tier1.length} teams), Tier 2 (${tier2.length} teams), Tier 3 (${tier3.length} teams).`);
+
+    const batch = writeBatch(db);
+    let logsUpdates = [];
+
+    // Rule 1: Relegate Bottom 3 from Mob League (Positions 18, 19, 20 assuming standard 20 team splits)
+    // Dynamic lookups allow flexibility regardless of total teams uploaded
+    if (tier1.length > 3 && tier2.length > 0) {
+      const relegatedFromT1 = tier1.slice(-3); 
+      const promotedFromT2 = tier2.slice(0, 3);
+
+      relegatedFromT1.forEach(team => {
+        batch.update(doc(db, "teams", team.id), { tier: "Mob Championship" });
+        logsUpdates.push(`⬇️ Relegated: ${team.name} dropped down to Mob Championship.`);
+      });
+
+      promotedFromT2.forEach(team => {
+        batch.update(doc(db, "teams", team.id), { tier: "Mob League" });
+        logsUpdates.push(`⬆️ Promoted: ${team.name} climbed up to Mob League!`);
+      });
+    }
+
+    // Rule 2: Relegate Bottom 3 from Mob Championship to Mob League One
+    if (tier2.length > 3 && tier3.length > 0) {
+      const relegatedFromT2 = tier2.slice(-3);
+      const promotedFromT3 = tier3.slice(0, 3);
+
+      relegatedFromT2.forEach(team => {
+        batch.update(doc(db, "teams", team.id), { tier: "Mob League One" });
+        logsUpdates.push(`⬇️ Relegated: ${team.name} dropped down to Mob League One.`);
+      });
+
+      promotedFromT3.forEach(team => {
+        batch.update(doc(db, "teams", team.id), { tier: "Mob Championship" });
+        logsUpdates.push(`⬆️ Promoted: ${team.name} climbed up to Mob Championship!`);
+      });
+    }
+
+    // Rule 3: Clear all scores/form to setup next season split
+    teams.forEach(t => {
+      batch.update(doc(db, "teams", t.id), {
+        played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0,
+        form: [] // Empty form history for a fresh calendar year
+      });
+    });
+
+    await batch.commit();
+
+    // Flash notifications and logging history outputs
+    logsUpdates.forEach(m => logToConsole(m));
+    pushFakeNews("cup", "🔄 DIVISION RESET: Promotion & Relegation Settled!", "The league board has authorized seasonal tier changes. Lower seed surprise packages celebrate their dynamic class jumps.");
+    
+    logToConsole("All database points initialized back to zero. Fresh season calendars generated!");
+    await renderPage({ user });
+  };
+
+  // ================= EXISTING SIMULATION PORTS =================
+
   document.getElementById("btnSimCups").onclick = async () => {
     logToConsole("Assembling all 69 clubs across tiers for the World Mob Cup simulation standard...");
-    
     const combined69Names = [...teams.map(t => t.name), ...TIER2_NAMES, ...TIER3_NAMES];
     const shuffledClubs = combined69Names.sort(() => Math.random() - 0.5);
 
@@ -278,35 +369,9 @@ export async function renderPage({ user } = {}) {
     };
     localStorage.setItem("mob_tourney_stats", JSON.stringify(tournamentStats));
 
-    pushFakeNews("cup", `🏆 WORLD MOB CUP FINALE: ${cupWinner} Crowned World Champions!`, `Against all odds, the absolute final matchday tree concluded with ${cupWinner} lifting the ultimate trophy in front of thousands.`);
-    
-    const randomTradedTeam = shuffledClubs[Math.floor(Math.random() * shuffledClubs.length)];
-    pushFakeNews("transfer", `💎 RECORD BLOCKBUSTER: New Superstar Signing for ${randomTradedTeam}!`, `Internal club sources confirm a massive contract deal has been reached ahead of next season's competition schedules.`);
-
-    logToConsole(`Tournament simulation complete! Champion: ${cupWinner}. Profiles updated and News Feed updated.`);
+    pushFakeNews("cup", `🏆 WORLD MOB CUP FINALE: ${cupWinner} Crowned World Champions!`, `The final match tree concluded with ${cupWinner} lifting the trophy.`);
     await renderPage({ user });
   };
-
-  // 3. Reset Season Lifecycles Data Tables
-  document.getElementById("btnEndSeason").onclick = async () => {
-    if (!confirm("Are you absolutely sure? This clears all points, goals, wins, and losses for all teams in Firestore.")) return;
-    
-    logToConsole("Archiving active statistics... wiping Firestore points records clean... ");
-    const batch = writeBatch(db);
-    
-    teams.forEach(t => {
-      const ref = doc(db, "teams", t.id);
-      batch.update(ref, { played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0 });
-    });
-
-    await batch.commit();
-    localStorage.removeItem("mob_news_feed");
-    
-    logToConsole("All database teams reset back to 0 points. A fresh pre-season is now active!");
-    await renderPage({ user });
-  };
-
-  // ================= CORE MAPPED EVENT CONTROLS =================
 
   $("saveRoyaleBtn").onclick = async () => {
     const a = $("wc1").value;
@@ -328,29 +393,44 @@ export async function renderPage({ user } = {}) {
         played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0,
         trophies: 0,
         stars: 3,
+        tier: "Mob League", // Baseline default division placement
         rivals: [],
+        form: [],
         createdAt: serverTimestamp()
       }, { merge: true });
     }
     await addNotification(`Teams updated (${lines.length}).`);
-    $("bulkMsg").textContent = `Added/updated ${lines.length} teams.`;
     await renderPage({ user });
   };
 
   const renderTeams = () => {
     const list = $("teamList");
     list.innerHTML = "";
-    teams.forEach(t => {
-      const div = document.createElement("div");
-      div.className = "row";
-      div.innerHTML = `
-        <div style="flex:1"><strong>${escapeHtml(t.name)}</strong></div>
-        <span class="tag" style="margin-right:6px; background:#ffaa00; color:#000;">⭐ ${t.stars || 3} Stars</span>
-        <span class="tag">Pts ${t.points || 0}</span>
-        <button class="btn" data-del="${t.id}" style="border-color:rgba(255,74,74,.35); color:#ffb3b3;">Remove</button>
-      `;
-      list.appendChild(div);
-    });
+    
+    // Sort logic matching display criteria
+    teams
+      .slice()
+      .sort((a,b) => (b.points || 0) - (a.points || 0) || (b.gd || 0) - (a.gd || 0))
+      .forEach(t => {
+        const div = document.createElement("div");
+        div.className = "row";
+        div.style.padding = "8px 0";
+        div.style.borderBottom = "1px solid rgba(255,255,255,0.05)";
+        
+        div.innerHTML = `
+          <div style="flex:1; display:flex; align-items:center; gap:12px;">
+            <strong>${escapeHtml(t.name)}</strong>
+            <span style="font-size:11px; opacity:0.5; background:rgba(255,255,255,0.1); padding:2px 6px; border-radius:3px;">${escapeHtml(t.tier || "Mob League")}</span>
+          </div>
+          <div style="margin-right:16px;">
+            ${renderFormCircles(t.form)}
+          </div>
+          <span class="tag" style="margin-right:6px; background:#ffaa00; color:#000;">⭐ ${t.stars || 3} Stars</span>
+          <span class="tag" style="min-width:55px; text-align:center;">Pts ${t.points || 0}</span>
+          <button class="btn" data-del="${t.id}" style="border-color:rgba(255,74,74,.35); color:#ffb3b3; padding:2px 8px; font-size:12px;">Remove</button>
+        `;
+        list.appendChild(div);
+      });
 
     list.querySelectorAll("button[data-del]").forEach(btn => {
       btn.onclick = async () => {
@@ -373,6 +453,7 @@ export async function renderPage({ user } = {}) {
       row.className = "card";
       row.style.padding = "12px";
       const rivalsStr = Array.isArray(t.rivals) ? t.rivals.join(", ") : "";
+      const currentTier = t.tier || "Mob League";
       
       row.innerHTML = `
         <div class="row">
@@ -380,19 +461,27 @@ export async function renderPage({ user } = {}) {
           <span class="right tag">ID: ${escapeHtml(t.id)}</span>
         </div>
 
-        <div class="grid" style="grid-template-columns:140px 140px 1fr; gap:10px; margin-top:10px;">
+        <div class="grid" style="grid-template-columns:130px 140px 150px 1fr; gap:10px; margin-top:10px;">
           <div>
             <label>Trophies</label>
             <input type="number" min="0" value="${Number(t.trophies || 0)}" data-trophy="${t.id}" style="width:100%;">
           </div>
           <div>
+            <label>League Division Tier</label>
+            <select data-tier="${t.id}" style="width:100%; padding:4px;">
+              <option value="Mob League" ${currentTier === "Mob League" ? 'selected' : ''}>Mob League (Tier 1)</option>
+              <option value="Mob Championship" ${currentTier === "Mob Championship" ? 'selected' : ''}>Mob Championship (Tier 2)</option>
+              <option value="Mob League One" ${currentTier === "Mob League One" ? 'selected' : ''}>Mob League One (Tier 3)</option>
+            </select>
+          </div>
+          <div>
             <label>Strength Star Rating</label>
             <select data-stars="${t.id}" style="width:100%; padding:4px;">
-              <option value="1" ${t.stars === 1 ? 'selected' : ''}>⭐ (1/5 - Poor)</option>
+              <option value="1" ${t.stars === 1 ? 'selected' : ''}>⭐ (1/5)</option>
               <option value="2" ${t.stars === 2 ? 'selected' : ''}>⭐⭐ (2/5)</option>
-              <option value="3" ${t.stars === 3 || !t.stars ? 'selected' : ''}>⭐⭐⭐ (3/5 - Mid)</option>
+              <option value="3" ${t.stars === 3 || !t.stars ? 'selected' : ''}>⭐⭐⭐ (3/5)</option>
               <option value="4" ${t.stars === 4 ? 'selected' : ''}>⭐⭐⭐⭐ (4/5)</option>
-              <option value="5" ${t.stars === 5 ? 'selected' : ''}>⭐⭐⭐⭐⭐ (5/5 - Elite)</option>
+              <option value="5" ${t.stars === 5 ? 'selected' : ''}>⭐⭐⭐⭐⭐ (5/5)</option>
             </select>
           </div>
           <div>
@@ -414,15 +503,16 @@ export async function renderPage({ user } = {}) {
       const id = btn.getAttribute("data-save");
       const trophies = Number(trophyList.querySelector(`input[data-trophy="${id}"]`).value || 0);
       const stars = Number(trophyList.querySelector(`select[data-stars="${id}"]`).value || 3);
+      const tier = trophyList.querySelector(`select[data-tier="${id}"]`).value;
       const rivalsRaw = trophyList.querySelector(`input[data-rivals="${id}"]`).value || "";
       const rivals = rivalsRaw.split(",").map(s => s.trim()).filter(Boolean);
 
-      await updateDoc(doc(db, "teams", id), { trophies, stars, rivals });
+      await updateDoc(doc(db, "teams", id), { trophies, stars, tier, rivals });
       await addNotification(`Updated configs for ${teams.find(t => t.id === id)?.name || "team"}.`);
       
       const msg = document.getElementById(`msg-${id}`);
       if (msg) msg.textContent = "Saved.";
-      logToConsole(`Committed profile changes for ${id} (Stars: ${stars}).`);
+      logToConsole(`Committed changes for ${id} (Tier: ${tier}).`);
     };
   });
 }
