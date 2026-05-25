@@ -3,7 +3,7 @@ import { $, escapeHtml, fetchTeams } from "../app.js";
 // Track active tier (1 = Mob League, 2 = Mob Championship, 3 = Mob League One)
 let activeTier = 1;
 
-// Generated teams for Tier 2: Mob Championship (24 Teams)
+// Generated placeholder teams for Tier 2: Mob Championship (24 Teams)
 const championshipTeams = [
   "Wither Skeleton FC", "Piglin Brute United", "Evoker City", "Vindicator Athletic",
   "Blaze Rovers", "Ghast Rangers", "Endermite FC", "Magma Cube Albion",
@@ -13,7 +13,7 @@ const championshipTeams = [
   "Elder Guardian FC", "Slime United", "Silverfish City", "Creaking Athletic"
 ].map(name => ({ name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }));
 
-// Generated teams for Tier 3: Mob League One (24 Teams)
+// Generated placeholder teams for Tier 3: Mob League One (24 Teams)
 const leagueOneTeams = [
   "Zombie Pigman FC", "Iron Golem United", "Snow Golem City", "Enderman Athletic",
   "Creeper Rovers", "Zombie Rangers", "Skeleton FC", "Spider United",
@@ -29,7 +29,7 @@ function zoneForPos(pos, total, tier) {
     if (pos === 1) return { key: "champ", label: "🏆 Champion" };
     if (pos >= 2 && pos <= 4) return { key: "qual", label: "✅ Qualifier" };
     if (pos >= 5 && pos <= 8) return { key: "play", label: "🎯 Playoff" };
-    if (pos >= 18) return { key: "rel", label: "⬇ Relegation" }; // Bottom 3 of 20
+    if (pos >= 18) return { key: "rel", label: "⬇ Relegation" };
     return { key: "norm", label: "— Normal" };
   }
   
@@ -37,7 +37,7 @@ function zoneForPos(pos, total, tier) {
   if (tier === 2) {
     if (pos >= 1 && pos <= 3) return { key: "prom", label: "⬆ Promotion" };
     if (pos >= 4 && pos <= 6) return { key: "play", label: "🎯 Promo Playoff" };
-    if (pos >= 22) return { key: "rel", label: "⬇ Relegation" }; // Bottom 3 of 24
+    if (pos >= 22) return { key: "rel", label: "⬇ Relegation" };
     return { key: "norm", label: "— Normal" };
   }
 
@@ -52,16 +52,16 @@ function zoneForPos(pos, total, tier) {
 }
 
 export async function renderPage() {
-  // Fetch tier 1 teams dynamically from backend database
-  const tier1Teams = await fetchTeams();
+  // Fetch all live teams from your Firebase database
+  const dbTeams = await fetchTeams();
   
   let currentTeams = [];
   let tierName = "";
   let legendHtml = "";
 
-  // Assign datasets and custom UI elements based on selection
   if (activeTier === 1) {
-    currentTeams = tier1Teams;
+    // TIER 1: Pull teams that are explicitly set to division 1, OR don't have a division key yet (your original 20 teams)
+    currentTeams = dbTeams.filter(t => t.division === 1 || t.division === "1" || !t.division);
     tierName = "Mob League";
     legendHtml = `
       <span class="tag">🏆 Champion (1st)</span>
@@ -71,7 +71,9 @@ export async function renderPage() {
       <span class="tag">⬇ Relegation (18–20)</span>
     `;
   } else if (activeTier === 2) {
-    currentTeams = championshipTeams;
+    // TIER 2: Pull from database if any team has division === 2. If none exist yet, display the generated 24 Championship mobs!
+    const dbTier2 = dbTeams.filter(t => t.division === 2 || t.division === "2");
+    currentTeams = dbTier2.length > 0 ? dbTier2 : championshipTeams;
     tierName = "Mob Championship";
     legendHtml = `
       <span class="tag">⬆ Promotion to Mob League (1st–3rd)</span>
@@ -80,7 +82,9 @@ export async function renderPage() {
       <span class="tag">⬇ Relegation to League One (22nd–24th)</span>
     `;
   } else {
-    currentTeams = leagueOneTeams;
+    // TIER 3: Pull from database if division === 3. If empty, fall back to our generated 24 League One mobs!
+    const dbTier3 = dbTeams.filter(t => t.division === 3 || t.division === "3");
+    currentTeams = dbTier3.length > 0 ? dbTier3 : leagueOneTeams;
     tierName = "Mob League One";
     legendHtml = `
       <span class="tag">⬆ Promotion to Championship (1st–3rd)</span>
@@ -91,7 +95,6 @@ export async function renderPage() {
 
   const total = currentTeams.length;
 
-  // Render navigation bar component inline using existing styling classes
   const navHtml = `
     <div class="row" style="gap: 8px; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 12px; width: 100%;">
       <button class="btn ${activeTier === 1 ? 'primary' : ''}" id="btnTier1">Mob League</button>
@@ -146,7 +149,6 @@ export async function renderPage() {
     </table>
   `;
 
-  // Attach interactive click listeners back to buttons
   document.getElementById("btnTier1").addEventListener("click", () => { activeTier = 1; renderPage(); });
   document.getElementById("btnTier2").addEventListener("click", () => { activeTier = 2; renderPage(); });
   document.getElementById("btnTier3").addEventListener("click", () => { activeTier = 3; renderPage(); });
