@@ -3,33 +3,33 @@ import { $, escapeHtml, fetchTeams } from "../app.js";
 // Track active tier (1 = Mob League, 2 = Mob Championship, 3 = Mob League One)
 let activeTier = 1;
 
-// Generated placeholder teams for Tier 2: Mob Championship (24 Teams)
+// Tier 2: Mob Championship (24 completely unique mobs - no duplicates from your live 21)
 const championshipTeams = [
-  "Wither Skeleton FC", "Piglin Brute United", "Evoker City", "Vindicator Athletic",
-  "Blaze Rovers", "Ghast Rangers", "Endermite FC", "Magma Cube Albion",
-  "Cave Spider Town", "Husk United", "Stray City", "Drowned Athletic",
-  "Phantom Rovers", "Shulker Rangers", "Hoglin FC", "Zoglin United",
-  "Ravager City", "Pillager Athletic", "Witch Rovers", "Guardian Rangers",
-  "Elder Guardian FC", "Slime United", "Silverfish City", "Creaking Athletic"
+  "Elder Guardians", "Evokers", "Vindicators", "Blazes", 
+  "Ghasts", "Hoglins", "Zoglins", "Ravagers", 
+  "Witches", "Magma Cubes", "Cave Spiders", "Husks", 
+  "Strays", "Phantoms", "Shulkers", "Silverfish", 
+  "The Creaking", "Piglin Brutes", "Vexes", "Guardians",
+  "Mooshrooms", "Striders", "Allays", "Sniffers"
 ].map(name => ({ name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }));
 
-// Generated placeholder teams for Tier 3: Mob League One (24 Teams)
+// Tier 3: Mob League One (24 completely unique mobs - no duplicates from your live 21)
 const leagueOneTeams = [
-  "Zombie Pigman FC", "Iron Golem United", "Snow Golem City", "Enderman Athletic",
-  "Creeper Rovers", "Zombie Rangers", "Skeleton FC", "Spider United",
-  "Wolf City", "Ocelot Athletic", "Polar Bear Rovers", "Panda Rangers",
-  "Llama FC", "Goat United", "Fox City", "Bee Athletic",
-  "Strider Rovers", "Frog Rangers", "Axolotl FC", "Glow Squid United",
-  "Dolphin City", "Turtle Athletic", "Chicken Rovers", "Cow Rangers"
+  "Zombie Villagers", "Glow Squids", "Dolphins", "Sea Turtles", 
+  "Frogs", "Punas", "Polar Bears", "Ocelots", 
+  "Llamas", "Trader Llamas", "Goats", "Bats", 
+  "Parrots", "Donkeys", "Mules", "Camels", 
+  "Armadillos", "Breezes", "Bogged Skeletons", "Cats",
+  "Puffers", "Salmon City", "Cod United", "Bees"
 ].map(name => ({ name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }));
 
 function zoneForPos(pos, total, tier) {
-  // Tier 1: Mob League (20 Teams)
+  // Tier 1: Mob League (21 Teams live)
   if (tier === 1) {
     if (pos === 1) return { key: "champ", label: "🏆 Champion" };
     if (pos >= 2 && pos <= 4) return { key: "qual", label: "✅ Qualifier" };
     if (pos >= 5 && pos <= 8) return { key: "play", label: "🎯 Playoff" };
-    if (pos >= 18) return { key: "rel", label: "⬇ Relegation" };
+    if (pos >= 18) return { key: "rel", label: "⬇ Relegation" }; // Bottom 4 face relegation
     return { key: "norm", label: "— Normal" };
   }
   
@@ -52,7 +52,6 @@ function zoneForPos(pos, total, tier) {
 }
 
 export async function renderPage() {
-  // Fetch all live teams from your Firebase database
   const dbTeams = await fetchTeams();
   
   let currentTeams = [];
@@ -60,7 +59,7 @@ export async function renderPage() {
   let legendHtml = "";
 
   if (activeTier === 1) {
-    // TIER 1: Pull teams that are explicitly set to division 1, OR don't have a division key yet (your original 20 teams)
+    // Show teams that are explicitly tier 1 OR don't have a tier value set yet (your 21 live teams)
     currentTeams = dbTeams.filter(t => t.division === 1 || t.division === "1" || !t.division);
     tierName = "Mob League";
     legendHtml = `
@@ -68,10 +67,10 @@ export async function renderPage() {
       <span class="tag">✅ Mob Royale Qualifiers (2–4)</span>
       <span class="tag">🎯 Mob Royale Playoffs (5–8)</span>
       <span class="tag">— Normal (9–17)</span>
-      <span class="tag">⬇ Relegation (18–20)</span>
+      <span class="tag">⬇ Relegation (18–21)</span>
     `;
   } else if (activeTier === 2) {
-    // TIER 2: Pull from database if any team has division === 2. If none exist yet, display the generated 24 Championship mobs!
+    // Show actual database division 2 teams if they exist. Otherwise, load the unique Championship placeholders!
     const dbTier2 = dbTeams.filter(t => t.division === 2 || t.division === "2");
     currentTeams = dbTier2.length > 0 ? dbTier2 : championshipTeams;
     tierName = "Mob Championship";
@@ -82,7 +81,7 @@ export async function renderPage() {
       <span class="tag">⬇ Relegation to League One (22nd–24th)</span>
     `;
   } else {
-    // TIER 3: Pull from database if division === 3. If empty, fall back to our generated 24 League One mobs!
+    // Show actual database division 3 teams if they exist. Otherwise, load the unique League One placeholders!
     const dbTier3 = dbTeams.filter(t => t.division === 3 || t.division === "3");
     currentTeams = dbTier3.length > 0 ? dbTier3 : leagueOneTeams;
     tierName = "Mob League One";
