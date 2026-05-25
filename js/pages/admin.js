@@ -53,10 +53,15 @@ export async function renderPage({ user } = {}) {
       
       <div class="card">
         <h3>⚡ Mass Simulate League Matches</h3>
-        <p class="muted small">Simulates round-robin combinations among all loaded database clubs. Weighted by Star Ratings (upsets can still happen!).</p>
+        <p class="muted small">Simulates random match fixtures among all loaded database clubs. Weighted by Star Ratings.</p>
+        
+        <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px;">
+          <label style="font-size: 12px; font-weight: bold; color: var(--accent);">Number of rounds to execute:</label>
+          <input type="number" id="inputSimRounds" min="1" max="100" value="1" style="width: 100%; padding: 6px; font-size: 14px; background: rgba(255,255,255,0.05); color: #fff; border: 1px solid rgba(255,255,255,0.15); border-radius: 4px;">
+        </div>
+
         <div class="row" style="gap:8px; margin-top:12px;">
-          <button class="btn primary" id="btnSim1" style="flex:1;">Sim 1 Round</button>
-          <button class="btn" id="btnSim10" style="background:#4aa3ff; color:white; flex:1;">Sim 10 Rounds</button>
+          <button class="btn primary" id="btnCustomSim" style="flex:1;">Simulate Specified Rounds</button>
         </div>
       </div>
 
@@ -154,7 +159,6 @@ export async function renderPage({ user } = {}) {
     const starsA = Number(teamA.stars || 3);
     const starsB = Number(teamB.stars || 3);
 
-    // Star values act as multipliers; 5-star teams are favored but 1-star teams can still win
     const weightA = Math.random() * starsA * 1.6;
     const weightB = Math.random() * starsB * 1.6;
 
@@ -169,15 +173,13 @@ export async function renderPage({ user } = {}) {
 
   // ================= SIMULATION EVENT WIRES =================
 
-  // 1. Mass League Game Simulators
+  // Dynamic Custom Match Simulator
   async function runLeagueSimulation(roundsCount) {
     if (teams.length < 2) return alert("Please load more teams before running simulations.");
+    if (isNaN(roundsCount) || roundsCount < 1) return alert("Please specify a valid round number of 1 or more.");
+    
     logToConsole(`Beginning verification for ${roundsCount} simulation match rounds...`);
-    
-    // Create operational batch sets to handle bulk fires safely
     const batch = writeBatch(db);
-    
-    // local copy state adjustments
     let localTeamsMap = new Map(teams.map(t => [t.id, { ...t, stars: (t.stars || 3) }]));
 
     for (let round = 0; round < roundsCount; round++) {
@@ -211,7 +213,6 @@ export async function renderPage({ user } = {}) {
       }
     }
 
-    // Commit processed local states back up to Firestore references
     for (const [id, data] of localTeamsMap.entries()) {
       const ref = doc(db, "teams", id);
       batch.update(ref, {
@@ -222,11 +223,9 @@ export async function renderPage({ user } = {}) {
 
     await batch.commit();
 
-    // Pick a random matchup to trigger fake sports news updates!
     const randomTeams = Array.from(localTeamsMap.values());
     const matchSubject = randomTeams[Math.floor(Math.random() * randomTeams.length)];
     
-    // Dynamic Manager Sacking logic condition based on performance
     if (matchSubject.lost > matchSubject.won + 2) {
       pushFakeNews("sack", `🚨 EMERGENCY EXIT: ${matchSubject.name} Manager Sacked!`, `Following poor results during simulation fixtures, the board has officially dismissed the first team coaching staff.`);
     } else {
@@ -237,22 +236,22 @@ export async function renderPage({ user } = {}) {
     await renderPage({ user });
   }
 
-  document.getElementById("btnSim1").onclick = () => runLeagueSimulation(1);
-  document.getElementById("btnSim10").onclick = () => runLeagueSimulation(10);
+  // Binds the execution directly to the value of your custom input element
+  document.getElementById("btnCustomSim").onclick = () => {
+    const roundsValue = parseInt(document.getElementById("inputSimRounds").value, 10);
+    runLeagueSimulation(roundsValue);
+  };
 
   // 2. Tournament Cups Simulation Execution Block
   document.getElementById("btnSimCups").onclick = async () => {
     logToConsole("Assembling all 69 clubs across tiers for the World Mob Cup simulation standard...");
     
-    // Collect all 69 entries
     const combined69Names = [...teams.map(t => t.name), ...TIER2_NAMES, ...TIER3_NAMES];
     const shuffledClubs = combined69Names.sort(() => Math.random() - 0.5);
 
-    // Choose winner based on star configurations
     let cupWinner = shuffledClubs[0];
     let topStarRating = 0;
     
-    // Look at a sample pool of 6 teams to award a high-odds or underdog winner
     for (let i = 0; i < Math.min(6, shuffledClubs.length); i++) {
       const currentName = shuffledClubs[i];
       const matchingLiveTeam = teams.find(t => t.name === currentName);
@@ -263,7 +262,6 @@ export async function renderPage({ user } = {}) {
       }
     }
 
-    // Check if the cup winner exists as a live editable club in Firestore
     const winnerId = slug(cupWinner);
     const winnerLiveMatch = teams.find(t => t.id === winnerId);
 
@@ -273,7 +271,6 @@ export async function renderPage({ user } = {}) {
       logToConsole(`Firestore match found: Awarded +1 Trophy to ${cupWinner}.`);
     }
 
-    // Save tournament tracking metadata locally for team.html profile views to intercept
     let tournamentStats = JSON.parse(localStorage.getItem("mob_tourney_stats") || "{}");
     tournamentStats[cupWinner] = {
       lastTrophy: "🌎 World Mob Cup Winner (2026)",
@@ -283,7 +280,6 @@ export async function renderPage({ user } = {}) {
 
     pushFakeNews("cup", `🏆 WORLD MOB CUP FINALE: ${cupWinner} Crowned World Champions!`, `Against all odds, the absolute final matchday tree concluded with ${cupWinner} lifting the ultimate trophy in front of thousands.`);
     
-    // Append a fake transfer signing headline alongside tournament wins
     const randomTradedTeam = shuffledClubs[Math.floor(Math.random() * shuffledClubs.length)];
     pushFakeNews("transfer", `💎 RECORD BLOCKBUSTER: New Superstar Signing for ${randomTradedTeam}!`, `Internal club sources confirm a massive contract deal has been reached ahead of next season's competition schedules.`);
 
@@ -295,7 +291,7 @@ export async function renderPage({ user } = {}) {
   document.getElementById("btnEndSeason").onclick = async () => {
     if (!confirm("Are you absolutely sure? This clears all points, goals, wins, and losses for all teams in Firestore.")) return;
     
-    logToConsole("Archiving active statistics... wiping Firestore points records clean...");
+    logToConsole("Archiving active statistics... wiping Firestore points records clean... ");
     const batch = writeBatch(db);
     
     teams.forEach(t => {
@@ -304,7 +300,7 @@ export async function renderPage({ user } = {}) {
     });
 
     await batch.commit();
-    localStorage.removeItem("mob_news_feed"); // Clean old news feed records for the next season split
+    localStorage.removeItem("mob_news_feed");
     
     logToConsole("All database teams reset back to 0 points. A fresh pre-season is now active!");
     await renderPage({ user });
@@ -331,7 +327,7 @@ export async function renderPage({ user } = {}) {
         name,
         played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0,
         trophies: 0,
-        stars: 3, // Initialized baseline rating
+        stars: 3,
         rivals: [],
         createdAt: serverTimestamp()
       }, { merge: true });
