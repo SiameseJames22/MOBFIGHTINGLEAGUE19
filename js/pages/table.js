@@ -11,7 +11,16 @@ const championshipTeams = [
   "Strays", "Phantoms", "Shulkers", "Silverfish", 
   "The Creaking", "Piglin Brutes", "Vexes", "Guardians",
   "Mooshrooms", "Striders", "Allays", "Sniffers"
-].map(name => ({ name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }));
+].map((name, i) => ({ 
+  name, 
+  played: 10, 
+  won: 8 - Math.floor(i/4), 
+  drawn: Math.floor(i/8), 
+  lost: Math.floor(i/4), 
+  gf: 32 - (i*1), 
+  ga: 10 + (i*1), 
+  points: 24 - (i*1)
+}));
 
 // Tier 3: Mob League One (24 completely unique mobs - no duplicates from your live 21)
 const leagueOneTeams = [
@@ -21,19 +30,26 @@ const leagueOneTeams = [
   "Parrots", "Donkeys", "Mules", "Camels", 
   "Armadillos", "Breezes", "Bogged Skeletons", "Cats",
   "Puffers", "Salmon City", "Cod United", "Bees"
-].map(name => ({ name, played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, points: 0 }));
+].map((name, i) => ({ 
+  name, 
+  played: 10, 
+  won: 7 - Math.floor(i/4), 
+  drawn: Math.floor(i/6), 
+  lost: Math.floor(i/4), 
+  gf: 28 - (i*1), 
+  ga: 12 + (i*1), 
+  points: 22 - (i*1)
+}));
 
 function zoneForPos(pos, total, tier) {
-  // Tier 1: Mob League (21 Teams live)
   if (tier === 1) {
     if (pos === 1) return { key: "champ", label: "🏆 Champion" };
     if (pos >= 2 && pos <= 4) return { key: "qual", label: "✅ Qualifier" };
     if (pos >= 5 && pos <= 8) return { key: "play", label: "🎯 Playoff" };
-    if (pos >= 18) return { key: "rel", label: "⬇ Relegation" }; // Bottom 4 face relegation
+    if (pos >= 18) return { key: "rel", label: "⬇ Relegation" };
     return { key: "norm", label: "— Normal" };
   }
   
-  // Tier 2: Mob Championship (24 Teams)
   if (tier === 2) {
     if (pos >= 1 && pos <= 3) return { key: "prom", label: "⬆ Promotion" };
     if (pos >= 4 && pos <= 6) return { key: "play", label: "🎯 Promo Playoff" };
@@ -41,7 +57,6 @@ function zoneForPos(pos, total, tier) {
     return { key: "norm", label: "— Normal" };
   }
 
-  // Tier 3: Mob League One (24 Teams)
   if (tier === 3) {
     if (pos >= 1 && pos <= 3) return { key: "prom", label: "⬆ Promotion" };
     if (pos >= 4 && pos <= 6) return { key: "play", label: "🎯 Promo Playoff" };
@@ -59,7 +74,6 @@ export async function renderPage() {
   let legendHtml = "";
 
   if (activeTier === 1) {
-    // Show teams that are explicitly tier 1 OR don't have a tier value set yet (your 21 live teams)
     currentTeams = dbTeams.filter(t => t.division === 1 || t.division === "1" || !t.division);
     tierName = "Mob League";
     legendHtml = `
@@ -70,7 +84,6 @@ export async function renderPage() {
       <span class="tag">⬇ Relegation (18–21)</span>
     `;
   } else if (activeTier === 2) {
-    // Show actual database division 2 teams if they exist. Otherwise, load the unique Championship placeholders!
     const dbTier2 = dbTeams.filter(t => t.division === 2 || t.division === "2");
     currentTeams = dbTier2.length > 0 ? dbTier2 : championshipTeams;
     tierName = "Mob Championship";
@@ -81,7 +94,6 @@ export async function renderPage() {
       <span class="tag">⬇ Relegation to League One (22nd–24th)</span>
     `;
   } else {
-    // Show actual database division 3 teams if they exist. Otherwise, load the unique League One placeholders!
     const dbTier3 = dbTeams.filter(t => t.division === 3 || t.division === "3");
     currentTeams = dbTier3.length > 0 ? dbTier3 : leagueOneTeams;
     tierName = "Mob League One";
@@ -128,11 +140,24 @@ export async function renderPage() {
         ${currentTeams.map((t, i) => {
           const pos = i + 1;
           const z = zoneForPos(pos, total, activeTier);
+          const computedGD = t.gd ?? ((t.gf || 0) - (t.ga || 0));
+          
+          // Build out the contextual tracking strings to push straight to the team page URL params!
+          const teamUrlParams = new URLSearchParams({
+            name: t.name,
+            rank: pos,
+            tier: tierName,
+            zone: z.label,
+            gf: t.gf || 0,
+            ga: t.ga || 0,
+            pts: t.points || 0
+          }).toString();
+
           return `
             <tr>
               <td>${pos}</td>
               <td>
-                <a href="./team.html?name=${encodeURIComponent(t.name)}" class="link" style="font-weight: bold; text-decoration: none;">
+                <a href="./team.html?${teamUrlParams}" class="link" style="font-weight: bold; text-decoration: none; color: white;">
                   ${escapeHtml(t.name)}
                 </a>
               </td>
@@ -143,7 +168,7 @@ export async function renderPage() {
               <td>${t.lost || 0}</td>
               <td>${t.gf || 0}</td>
               <td>${t.ga || 0}</td>
-              <td>${t.gd ?? ((t.gf || 0) - (t.ga || 0))}</td>
+              <td>${computedGD}</td>
               <td><strong>${t.points || 0}</strong></td>
             </tr>
           `;
