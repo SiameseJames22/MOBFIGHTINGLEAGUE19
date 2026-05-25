@@ -380,60 +380,84 @@ export async function renderPage({ user } = {}) {
     await renderPage({ user });
   };
 
-  // ================= REPAIRED CUP TOURNAMENT ENGINE =================
+  // ================= FIXED CUP TOURNAMENT ENGINE =================
   document.getElementById("btnSimCups").onclick = async () => {
-    logToConsole("Assembling all 69 clubs across tiers for the World Mob Cup simulation standard...");
+    logToConsole("Assembling all available clubs across tiers for the World Mob Cup simulation standard...");
     
-    // 1. Gather all potential names across dynamic tiers
-    const combined69Names = [...teams.map(t => t.name), ...TIER2_NAMES, ...TIER3_NAMES];
-    const shuffledClubs = combined69Names.sort(() => Math.random() - 0.5);
+    // Fallback un-loaded structures to match against if your database hasn't imported them yet
+    const fallbackTier2 = TIER2_NAMES.map(name => ({ id: slug(name), name, tier: "Mob Championship", stars: 3 }));
+    const fallbackTier3 = TIER3_NAMES.map(name => ({ id: slug(name), name, tier: "Mob League One", stars: 3 }));
+    
+    // Combine live custom teams and fill remaining slots with our background names safely
+    let balancedRoster = [...teams];
+    [...fallbackTier2, ...fallbackTier3].forEach(fallbackItem => {
+       if(!balancedRoster.some(t => t.id === fallbackItem.id)) {
+          balancedRoster.push(fallbackItem);
+       }
+    });
+
+    // Shuffle match order parameters
+    const shuffledClubs = balancedRoster.sort(() => Math.random() - 0.5);
 
     let cupWinner = shuffledClubs[0];
     let topStarRating = 0;
     
-    // 2. Select a winner from a pool weighted by stars 
-    for (let i = 0; i < Math.min(6, shuffledClubs.length); i++) {
-      const currentName = shuffledClubs[i];
-      // Lookup match based strictly on name matching properties
-      const matchingLiveTeam = teams.find(t => t.name.toLowerCase() === currentName.toLowerCase());
-      const teamStars = matchingLiveTeam ? (matchingLiveTeam.stars || 3) : 3;
+    // Simulate knockout bracket selector weighted by dynamic performance flags
+    for (let i = 0; i < Math.min(8, shuffledClubs.length); i++) {
+      const currentTeam = shuffledClubs[i];
+      const teamStars = Number(currentTeam.stars || 3);
+      const scoreWeight = teamStars + (Math.random() * 3);
       
-      if (teamStars + Math.random() * 2 > topStarRating) {
-        topStarRating = teamStars;
-        cupWinner = currentName;
+      if (scoreWeight > topStarRating) {
+        topStarRating = scoreWeight;
+        cupWinner = currentTeam;
       }
     }
 
-    // FIXED: Convert target name to lowercase-dashed document ID format
-    const winnerId = slug(cupWinner);
-    // Find the live record inside your loaded array matching that exact generated ID string
-    const winnerLiveMatch = teams.find(t => t.id === winnerId);
+    logToConsole(`🏆 Tournament calculation complete! Winner: ${cupWinner.name}`);
 
-    if (winnerLiveMatch) {
-      const currentTrophies = Number(winnerLiveMatch.trophies || 0);
-      const updatedTrophiesCount = currentTrophies + 1;
+    // Check if winner is already an explicit active document inside Firebase
+    const winnerId = cupWinner.id;
+    const isLiveInDatabase = teams.some(t => t.id === winnerId);
+
+    if (isLiveInDatabase) {
+      // Existing team: increment document trophy field counters
+      const matchInArray = teams.find(t => t.id === winnerId);
+      const updatedTrophiesCount = Number(matchInArray.trophies || 0) + 1;
       
-      // Update data point in Firestore database reference
       await updateDoc(doc(db, "teams", winnerId), { trophies: updatedTrophiesCount });
-      
-      // FIXED: Directly update your local script memory array so it displays on render instantly!
-      winnerLiveMatch.trophies = updatedTrophiesCount;
-      logToConsole(`Firestore match found: Awarded +1 Trophy to ${winnerLiveMatch.name}. Total: ${updatedTrophiesCount}`);
+      matchInArray.trophies = updatedTrophiesCount;
+      logToConsole(`Updated ${matchInArray.name} in Firestore. New trophy total: ${updatedTrophiesCount}`);
     } else {
-      logToConsole(`Notice: Cup won by ${cupWinner} (Tier 2/3 un-loaded fallback club).`);
+      // Background team won! Automatically provision and save them to the database
+      logToConsole(`Background club context triggered. Saving ${cupWinner.name} to Firestore data roster...`);
+      
+      const newTeamObj = {
+        name: cupWinner.name,
+        played: 0, won: 0, drawn: 0, lost: 0, gf: 0, ga: 0, gd: 0, points: 0,
+        trophies: 1,
+        stars: 3,
+        tier: cupWinner.tier || "Mob Championship",
+        rivals: [],
+        form: [],
+        createdAt: serverTimestamp()
+      };
+      
+      await setDoc(doc(db, "teams", winnerId), newTeamObj);
+      teams.push({ id: winnerId, ...newTeamObj });
     }
 
-    // Save tournament statistics to local storage for profiles
+    // Save tournament tracking metrics to local storage profiles
     let tournamentStats = JSON.parse(localStorage.getItem("mob_tourney_stats") || "{}");
-    tournamentStats[cupWinner] = {
+    tournamentStats[cupWinner.name] = {
       lastTrophy: "🌎 World Mob Cup Winner (2026)",
       statusZone: "🏆 Global Tournament Winner"
     };
     localStorage.setItem("mob_tourney_stats", JSON.stringify(tournamentStats));
 
-    pushFakeNews("cup", `🏆 WORLD MOB CUP FINALE: ${cupWinner} Crowned World Champions!`, `The final match tree concluded with ${cupWinner} lifting the trophy.`);
+    pushFakeNews("cup", `🏆 WORLD MOB CUP FINALE: ${cupWinner.name} Crowned World Champions!`, `The final match tree concluded with ${cupWinner.name} lifting the gold trophy.`);
     
-    // Re-render UI to update view logs
+    // Refresh visual state layout instantly
     await renderPage({ user });
   };
 
