@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Mob Sports Network - Breaking News</title>
+  <style>
+    :root { --bg:#0b0f14; --card:#121a24; --text:#e7eefc; --muted:#98a6bf; --accent:#ffaa00; --danger:#ff4a4a; --ok:#3dff8b; }
+    * { box-sizing: border-box; font-family: system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: var(--bg); color: var(--text); padding: 24px; }
+    .wrap { max-width: 800px; margin: 0 auto; }
+    header { border-bottom: 3px solid var(--accent); padding-bottom: 12px; margin-bottom: 24px; display: flex; justify-content: space-between; align-items: center; }
+    .logo { font-size: 24px; font-weight: 900; color: var(--accent); letter-spacing: -0.5px; }
+    .news-card { background: var(--card); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 18px; margin-bottom: 16px; border-left: 4px solid var(--accent); position: relative; }
+    .news-card.alert { border-left-color: var(--danger); }
+    .news-time { font-size: 11px; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; font-weight: bold; }
+    .news-title { font-size: 18px; font-weight: 700; margin-bottom: 8px; line-height: 1.4; }
+    .news-body { font-size: 13px; color: var(--muted); line-height: 1.5; }
+    .empty { text-align: center; color: var(--muted); padding: 40px; font-style: italic; }
+    .nav-btn { background: var(--card); border: 1px solid rgba(255,255,255,0.1); color: white; padding: 6px 12px; border-radius: 6px; text-decoration: none; font-size: 12px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">📰 MOB SPORTS BREAKING</div>
+    <a href="./index.html" class="nav-btn">Back to Table</a>
+  </header>
+
+  <div id="newsFeed"></div>
+</div>
+
+<script>
+  const systemFeed = JSON.parse(localStorage.getItem("mob_news_feed") || "[]");
+  const fallbackNews = [
+    { type: "general", title: "Pre-Season Training Intensity Ramps Up Across All Divisions", body: "Managers are demanding absolute physical focus from players as preparation schedules peak before upcoming tournament matchdays.", time: "2 hours ago" },
+    { type: "general", title: "Transfer Speculation Rules Market as Window Closure Approaches", body: "Scouts report massive contract offers floating around elite tier clubs trying to secure high-rated wildcard talent.", time: "5 hours ago" }
+  ];
+
+  const fullFeed = systemFeed.length > 0 ? systemFeed : fallbackNews;
+  document.getElementById("newsFeed").innerHTML = fullFeed.map(n => `
+    <div class="news-card ${n.type === 'sack' || n.type === 'result' ? 'alert' : ''}">
+      <div class="news-time">🕒 ${n.time || 'Breaking News'}</div>
+      <div class="news-title">${n.title}</div>
+      <div class="news-body">${n.body}</div>
+    </div>
+  `).join("");
+</script>
+</body>
+</html>
