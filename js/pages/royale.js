@@ -24,10 +24,11 @@ export async function renderPage({ user } = {}) {
   const dbTeams = await fetchTeams(); // Live Tier 1 Mobs (21 teams)
   const { seasonYear } = getSeasonInfo(new Date());
 
-  // 1. ASSEMBLE ALL COMBINED 69 CLUBS FOR THE WORLD MOB CUP
+  // 1. ASSEMBLE ALL COMBINED 69 CLUBS FOR THE WORLD MOB CUP (ALL FORCED TO 0 POINTS)
+  const t1Teams = dbTeams.map(t => ({ name: t.name, points: 0, gd: 0 }));
   const t2Teams = tier2Names.map(name => ({ name, points: 0, gd: 0 }));
   const t3Teams = tier3Names.map(name => ({ name, points: 0, gd: 0 }));
-  const all69Clubs = [...dbTeams.map(t => ({ name: t.name, points: t.points || 0, gd: t.gd || 0 })), ...t2Teams, ...t3Teams];
+  const all69Clubs = [...t1Teams, ...t2Teams, ...t3Teams];
 
   // 2. MOB ROYALE SEEDING LOGIC
   const top4 = dbTeams.slice(0, 4);
@@ -44,7 +45,7 @@ export async function renderPage({ user } = {}) {
     { label: "Playoff Pick #1", team: wcTeams[0] || null }, { label: "Playoff Pick #2", team: wcTeams[1] || null },
   ];
 
-  // 3. NAVIGATION BAR UI (Toggles between all 4 elite tournaments)
+  // 3. NAVIGATION BAR UI
   const menuNavHtml = `
     <div class="row" style="gap: 8px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.08); padding-bottom: 14px; flex-wrap: wrap; width: 100%;">
       <button class="btn ${activeView === 'royale' ? 'primary' : ''}" id="navRoyale">Mob Royale Slots</button>
@@ -132,22 +133,15 @@ export async function renderPage({ user } = {}) {
     `;
   }
 
-  // ================= VIEW: WORLD MOB CUP (ALL 69 CLUBS) =================
+  // ================= VIEW: WORLD MOB CUP (ALL BLANK - 0 POINTS) =================
   else if (activeView === "world_cup") {
-    // Distribute all 69 clubs across 8 distinct Groups (approx 8-9 clubs per group)
     const totalGroups = 8;
     const groupLetters = ["A", "B", "C", "D", "E", "F", "G", "H"];
     const groupsData = Array.from({ length: totalGroups }, () => []);
     
+    // Distribute clubs evenly
     all69Clubs.forEach((club, index) => {
       groupsData[index % totalGroups].push(club);
-    });
-
-    // Extract group winners to form the knockout stage simulations
-    const simulatedKnockoutTeams = groupLetters.map((letter, i) => {
-      // Use highest sorting index or active database points to decide a simulated winner
-      const sorted = [...groupsData[i]].sort((a,b) => b.points - a.points);
-      return sorted[0]?.name || `Winner Group ${letter}`;
     });
 
     mainBodyHtml = `
@@ -158,7 +152,7 @@ export async function renderPage({ user } = {}) {
 
       <div class="banner" style="margin:10px 0; background:rgba(255, 170, 0, 0.1); border-color:#ffaa00;">
         <strong>THE GLOBAL SHOWDOWN</strong>
-        <div class="muted small">Every single club across all three tiers competes in the group stage. Group leaders advance to the sudden death knockouts!</div>
+        <div class="muted small">Every single club across all three tiers starts fresh in the group stage. Group leaders advance to the sudden death knockouts!</div>
       </div>
 
       <h2 style="margin-top:24px; border-bottom: 2px solid #ffaa00; padding-bottom:6px;">1. Group Stages</h2>
@@ -170,12 +164,12 @@ export async function renderPage({ user } = {}) {
               <thead><tr><th>#</th><th>Club</th><th>Pts</th></tr></thead>
               <tbody>
                 ${groupsData[groupIdx].map((club, itemIdx) => `
-                  <tr style="${itemIdx === 0 ? 'background:rgba(255,170,0,0.08); font-weight:bold;' : ''}">
+                  <tr>
                     <td>${itemIdx + 1}</td>
                     <td style="white-space:nowrap; max-width:160px; overflow:hidden; text-overflow:ellipsis;">
-                      ${itemIdx === 0 ? '⭐ ' : ''}${escapeHtml(club.name)}
+                      ${escapeHtml(club.name)}
                     </td>
-                    <td>${club.points + (12 - itemIdx)}</td>
+                    <td><strong>0</strong></td>
                   </tr>
                 `).join("")}
               </tbody>
@@ -190,17 +184,17 @@ export async function renderPage({ user } = {}) {
         <div class="card" style="background:rgba(255,255,255,0.02);">
           <div class="tag" style="background:#ffaa00; color:black; font-weight:bold; margin-bottom:12px;">Quarter-Final Brackets</div>
           <div class="grid" style="grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:12px;">
-            <div class="card alt" style="font-size:12px; padding:10px;">
-              <strong>QF1:</strong> ${escapeHtml(simulatedKnockoutTeams[0])} <br><span class="muted">vs</span><br> <strong>${escapeHtml(simulatedKnockoutTeams[7])}</strong>
+            <div class="card alt" style="font-size:12px; padding:10px; text-align:center;">
+              <strong>QF1:</strong> <span class="muted">Winner Group A vs Winner Group H</span>
             </div>
-            <div class="card alt" style="font-size:12px; padding:10px;">
-              <strong>QF2:</strong> <strong>${escapeHtml(simulatedKnockoutTeams[1])}</strong> <br><span class="muted">vs</span><br> ${escapeHtml(simulatedKnockoutTeams[6])}
+            <div class="card alt" style="font-size:12px; padding:10px; text-align:center;">
+              <strong>QF2:</strong> <span class="muted">Winner Group B vs Winner Group G</span>
             </div>
-            <div class="card alt" style="font-size:12px; padding:10px;">
-              <strong>QF3:</strong> ${escapeHtml(simulatedKnockoutTeams[2])} <br><span class="muted">vs</span><br> <strong>${escapeHtml(simulatedKnockoutTeams[5])}</strong>
+            <div class="card alt" style="font-size:12px; padding:10px; text-align:center;">
+              <strong>QF3:</strong> <span class="muted">Winner Group C vs Winner Group F</span>
             </div>
-            <div class="card alt" style="font-size:12px; padding:10px;">
-              <strong>QF4:</strong> <strong>${escapeHtml(simulatedKnockoutTeams[3])}</strong> <br><span class="muted">vs</span><br> ${escapeHtml(simulatedKnockoutTeams[4])}
+            <div class="card alt" style="font-size:12px; padding:10px; text-align:center;">
+              <strong>QF4:</strong> <span class="muted">Winner Group D vs Winner Group E</span>
             </div>
           </div>
         </div>
@@ -209,20 +203,20 @@ export async function renderPage({ user } = {}) {
           <div class="card">
             <div class="tag" style="background:#ff5500; margin-bottom:10px;">Semi-Final Brackets</div>
             <div class="row" style="justify-content: space-around; flex-wrap:wrap; gap:15px; font-size:13px;">
-              <div>${escapeHtml(simulatedKnockoutTeams[7])} vs <strong>${escapeHtml(simulatedKnockoutTeams[1])}</strong></div>
+              <div><span class="muted">Winner QF1 vs Winner QF2</span></div>
               <div class="muted">|</div>
-              <div>${escapeHtml(simulatedKnockoutTeams[5])} vs <strong>${escapeHtml(simulatedKnockoutTeams[3])}</strong></div>
+              <div><span class="muted">Winner QF3 vs Winner QF4</span></div>
             </div>
           </div>
 
-          <div class="card" style="text-align:center; background: radial-gradient(circle, #221a0f, #120d07); border: 2px solid #ffaa00; padding: 30px 20px;">
+          <div class="card" style="text-align:center; background: radial-gradient(circle, #1a1a1a, #0b0f14); border: 2px solid rgba(255,170,0,0.3); padding: 30px 20px;">
             <div style="font-size:36px; margin-bottom:8px;">🏆</div>
             <h3 style="color:#ffaa00; border:none; margin:0; font-size:16px; letter-spacing:1px;">GRAND FINALE</h3>
-            <div style="font-size:22px; margin:14px 0; font-weight:800;">
-              ${escapeHtml(simulatedKnockoutTeams[1])} <span style="color:#ff5500; font-size:16px; font-weight:normal;">vs</span> ${escapeHtml(simulatedKnockoutTeams[3])}
+            <div style="font-size:20px; margin:14px 0; font-weight:800; color:var(--muted);">
+              TBD vs TBD
             </div>
-            <div class="tag" style="background:#ffaa00; color:black; font-weight:bold; font-size:13px; padding:4px 14px;">
-              🏆 FINAL WINNER: ${escapeHtml(simulatedKnockoutTeams[1]).toUpperCase()}
+            <div class="tag" style="background:rgba(255,255,255,0.05); color:var(--muted); font-size:13px; padding:4px 14px;">
+              AWAITING TOURNAMENT PROGRESS
             </div>
           </div>
         </div>
